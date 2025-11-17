@@ -1,5 +1,6 @@
 import React from "react";
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from "react-native";
+import theme from '../theme';
 
 interface ReceiptProps {
   cart: {
@@ -50,14 +51,14 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   modal: {
-    backgroundColor: "#fff",
+    backgroundColor: theme.colors.card,
     width: "85%",
     borderRadius: 16,
     padding: 20,
     elevation: 6,
   },
   title: { fontSize: 20, fontWeight: "700", textAlign: "center" },
-  date: { textAlign: "center", color: "#777", marginVertical: 6 },
+  date: { textAlign: "center", color: theme.colors.muted, marginVertical: 6 },
   scrollView: { marginVertical: 10 },
   row: {
     flexDirection: "row",
@@ -69,9 +70,9 @@ const styles = StyleSheet.create({
   total: { fontSize: 18, fontWeight: "700", marginTop: 10, textAlign: "right" },
   closeBtn: {
     marginTop: 14,
-    backgroundColor: "#007AFF",
+    backgroundColor: theme.colors.accent,
     paddingVertical: 10,
     borderRadius: 10,
   },
-  closeText: { color: "#fff", fontWeight: "700", textAlign: "center" },
+  closeText: { color: theme.colors.card, fontWeight: "700", textAlign: "center" },
 });

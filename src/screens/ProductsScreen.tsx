@@ -119,12 +119,16 @@ const ProductsScreen = () => {
         <ActivityIndicator size="large" style={styles.activityIndicator} />
       ) : (
         <>
-          <TextInput
-            placeholder="Kamu nyari produk apa?"
-            style={styles.searchInput}
-            value={query}
-            onChangeText={setQuery}
-          />
+          <View style={styles.searchWrapper}>
+            <Icon name="magnify" size={20} color={theme.colors.muted} style={styles.searchIcon} />
+            <TextInput
+              placeholder="Kamu nyari produk apa?"
+              style={styles.searchInput}
+              value={query}
+              onChangeText={setQuery}
+              placeholderTextColor={theme.colors.placeholder}
+            />
+          </View>
           <FlatList
             data={products.filter(p => p.name.toLowerCase().includes(query.toLowerCase()))}
             numColumns={2}
@@ -137,11 +141,11 @@ const ProductsScreen = () => {
               <Text style={styles.stock}>Stok: {item.stock}</Text>
 
               <View style={styles.actions}>
-                <TouchableOpacity onPress={() => openEditModal(item)}>
-                  <Icon name="pencil" size={20} color="#4A90E2" />
-                </TouchableOpacity>
+                  <TouchableOpacity onPress={() => openEditModal(item)}>
+                    <Icon name="pencil" size={20} color={theme.colors.accent} />
+                  </TouchableOpacity>
                 <TouchableOpacity onPress={() => handleDelete(item.id)}>
-                  <Icon name="delete" size={20} color="#E94F37" />
+                  <Icon name="delete" size={20} color={theme.colors.danger} />
                 </TouchableOpacity>
               </View>
             </View>
@@ -159,7 +163,7 @@ const ProductsScreen = () => {
           setForm({ name: '', price: '', stock: '', image: '' });
           setModalVisible(true);
         }}>
-        <Icon name="plus" size={26} color="#fff" />
+        <Icon name="plus" size={26} color={theme.colors.card} />
       </TouchableOpacity>
 
       
@@ -216,20 +220,20 @@ export default ProductsScreen;
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: theme.colors.background, padding: 15 },
-  header: { fontSize: 22, fontWeight: '700', marginVertical: 10, color: '#333' },
+  header: { fontSize: 22, fontWeight: '700', marginVertical: 10, color: theme.colors.text },
   activityIndicator: { marginTop: 50 },
   card: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: theme.colors.card,
     margin: 8,
     borderRadius: 12,
     padding: 10,
     alignItems: 'center',
   },
   image: { width: 100, height: 100, borderRadius: 10, marginBottom: 8 },
-  name: { fontWeight: '600', fontSize: 16, color: '#333' },
-  price: { color: '#4A90E2', fontWeight: '600', marginVertical: 4 },
-  stock: { color: '#888', fontSize: 13 },
+  name: { fontWeight: '600', fontSize: 16, color: theme.colors.text },
+  price: { color: theme.colors.accent, fontWeight: '600', marginVertical: 4 },
+  stock: { color: theme.colors.muted, fontSize: 13 },
   actions: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -240,7 +244,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     bottom: 20,
     right: 20,
-    backgroundColor: '#007AFF',
+    backgroundColor: theme.colors.accent,
     width: 60,
     height: 60,
     borderRadius: 30,
@@ -255,22 +259,32 @@ const styles = StyleSheet.create({
   },
   modalBox: {
     width: '90%',
-    backgroundColor: '#fff',
+    backgroundColor: theme.colors.card,
     borderRadius: 12,
     padding: 20,
   },
   modalTitle: { fontSize: 18, fontWeight: '700', marginBottom: 10 },
   input: {
-    backgroundColor: '#F1F1F1',
+    backgroundColor: theme.colors.inputBackground,
     borderRadius: 8,
     padding: 10,
     marginVertical: 6,
   },
-  modalButtons: { flexDirection: 'row', justifyContent: 'flex-end', marginTop: 10 },
-  btnCancel: { marginRight: 10 },
-  btnSave: { backgroundColor: '#4A90E2', paddingHorizontal: 18, paddingVertical: 8, borderRadius: 6 },
-  btnTextCancel: { color: '#666', fontWeight: '600' },
-  btnTextSave: { color: '#fff', fontWeight: '700' },
+  modalButtons: { flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center', marginTop: 12 },
+  btnCancel: {
+    marginRight: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 6,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'transparent',
+  },
+  btnSave: { backgroundColor: theme.colors.accent, paddingHorizontal: 18, paddingVertical: 8, borderRadius: 6, justifyContent: 'center', alignItems: 'center' },
+  btnTextCancel: { color: theme.colors.placeholder, fontWeight: '600' },
+  btnTextSave: { color: theme.colors.card, fontWeight: '700' },
   listContent: { paddingBottom: 100 },
-  searchInput: { backgroundColor: '#fff', padding: 8, borderRadius: 8, marginBottom: 8 },
+  searchWrapper: { flexDirection: 'row', alignItems: 'center', backgroundColor: theme.colors.card, paddingHorizontal: 10, borderRadius: 8, marginBottom: 8 },
+  searchIcon: { marginRight: 8 },
+  searchInput: { flex: 1, paddingVertical: 8 },
 });

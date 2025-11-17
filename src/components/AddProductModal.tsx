@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Modal, View, Text, TextInput, Button, StyleSheet, Alert } from 'react-native';
+import theme from '../theme';
 
 interface Props {
   visible: boolean;
@@ -17,7 +18,7 @@ const AddProductModal: React.FC<Props> = ({ visible, onClose, onSave }) => {
       Alert.alert('Error', 'Semua field wajib diisi!');
       return;
     }
-    onSave(name, parseFloat(price), parseInt(stock));
+    onSave(name, parseFloat(price), parseInt(stock, 10));
     setName('');
     setPrice('');
     setStock('');
@@ -44,9 +45,9 @@ const AddProductModal: React.FC<Props> = ({ visible, onClose, onSave }) => {
 
 const styles = StyleSheet.create({
   overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'center', alignItems: 'center' },
-  modalContainer: { backgroundColor: '#fff', padding: 20, borderRadius: 10, width: '85%' },
+  modalContainer: { backgroundColor: theme.colors.card, padding: 20, borderRadius: 10, width: '85%' },
   title: { fontSize: 18, fontWeight: 'bold', marginBottom: 10 },
-  input: { borderWidth: 1, borderColor: '#ccc', padding: 10, borderRadius: 8, marginVertical: 5 },
+  input: { borderWidth: 1, borderColor: theme.colors.border, padding: 10, borderRadius: 8, marginVertical: 5 },
   buttons: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 10 },
 });
 

@@ -55,11 +55,11 @@ export default function HomeScreen() {
       <Text style={styles.title}>Dashboard</Text>
       <View style={styles.cardContainer}>
         <View style={styles.card}>
-          <Text style={styles.cardLabel}>Pendapatan Harian</Text>
+          <Text style={styles.cardLabel}>Pendapatan Hari ini</Text>
           <Text style={styles.cardValue}>Rp {dailyRevenue.toLocaleString()}</Text>
         </View>
         <View style={styles.card}>
-          <Text style={styles.cardLabel}>Pendapatan Mingguan</Text>
+          <Text style={styles.cardLabel}>Pendapatan Minggu ini</Text>
           <Text style={styles.cardValue}>Rp {weeklyRevenue.toLocaleString()}</Text>
         </View>
       </View>
@@ -123,46 +123,46 @@ const styles = StyleSheet.create({
   title: { fontSize: 24, fontWeight: "700", marginBottom: 16 },
   cardContainer: { flexDirection: "row", justifyContent: "space-between" },
   card: {
-    backgroundColor: "#fff",
+    backgroundColor: theme.colors.card,
     flex: 1,
     margin: 6,
     padding: 16,
     borderRadius: 12,
   },
-  cardLabel: { fontSize: 14, color: "#555" },
-  cardValue: { fontSize: 18, fontWeight: "700", color: "#333", marginTop: 4 },
+  cardLabel: { fontSize: 14, color: theme.colors.muted },
+  cardValue: { fontSize: 18, fontWeight: "700", color: theme.colors.text, marginTop: 4 },
   subtitle: { marginTop: 20, fontSize: 18, fontWeight: "600" },
   transactionItem: {
     flexDirection: "row",
     justifyContent: "space-between",
-    backgroundColor: "#fff",
+    backgroundColor: theme.colors.card,
     padding: 12,
     borderRadius: 10,
     marginVertical: 6,
   },
-  transactionDate: { color: "#666" },
-  transactionTotal: { fontWeight: "700", color: "#222" },
+  transactionDate: { color: theme.colors.placeholder },
+  transactionTotal: { fontWeight: "700", color: theme.colors.text },
   transactionDetails: { marginTop: 8, paddingTop: 8, borderTopWidth: 1, borderTopColor: '#f0f0f0' },
   detailRow: { flexDirection: 'row', justifyContent: 'space-between', marginVertical: 4 },
-  detailName: { color: '#333', fontSize: 13 },
-  detailPrice: { color: '#4A90E2', fontWeight: '600' },
+  detailName: { color: theme.colors.text, fontSize: 13 },
+  detailPrice: { color: theme.colors.accent, fontWeight: '600' },
   detailContainer: { marginVertical: 6 },
   detailMain: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  detailTotal: { color: '#222', fontWeight: '700' },
+  detailTotal: { color: theme.colors.text, fontWeight: '700' },
   detailSub: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 2 },
-  detailUnit: { color: '#888', fontSize: 12 },
-  detailNote: { color: '#666', fontSize: 12 },
+  detailUnit: { color: theme.colors.muted, fontSize: 12 },
+  detailNote: { color: theme.colors.placeholder, fontSize: 12 },
   flexOne: { flex: 1 },
   transactionSummary: { marginTop: 6, alignItems: 'flex-end' },
   modalOverlay: { flex: 1, backgroundColor: '#00000066', justifyContent: 'center', alignItems: 'center' },
-  modalBox: { width: '90%', backgroundColor: '#fff', borderRadius: 12, padding: 16 },
+  modalBox: { width: '90%', backgroundColor: theme.colors.card, borderRadius: 12, padding: 16 },
   modalTitle: { fontSize: 18, fontWeight: '700', marginBottom: 8, textAlign: 'center' },
   receiptItem: { flexDirection: 'row', justifyContent: 'space-between', marginVertical: 6 },
-  itemText: { color: '#333' },
-  itemPrice: { color: '#4A90E2', fontWeight: '600' },
-  receiptDivider: { borderBottomWidth: 1, borderColor: '#ddd', marginVertical: 8 },
+  itemText: { color: theme.colors.text },
+  itemPrice: { color: theme.colors.accent, fontWeight: '600' },
+  receiptDivider: { borderBottomWidth: 1, borderColor: theme.colors.border, marginVertical: 8 },
   receiptTotal: { textAlign: 'right', fontWeight: '700', marginTop: 6 },
-  btnClose: { marginTop: 12, backgroundColor: '#4A90E2', padding: 10, borderRadius: 8 },
-  btnTextSave: { color: '#fff', textAlign: 'center', fontWeight: '700' },
+  btnClose: { marginTop: 12, backgroundColor: theme.colors.accent, padding: 10, borderRadius: 8 },
+  btnTextSave: { color: theme.colors.card, textAlign: 'center', fontWeight: '700' },
   detailList: { maxHeight: 300 },
 });

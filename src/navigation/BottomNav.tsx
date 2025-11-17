@@ -10,10 +10,12 @@ const Tab = createBottomTabNavigator();
 
 const renderTabBar = (props: BottomTabBarProps) => <CoolTabBar {...props} />;
 
+import theme from '../theme';
+
 const screenOptions = () => ({
   headerShown: false,
-  tabBarActiveTintColor: '#007AFF',
-  tabBarInactiveTintColor: '#8e8e93',
+  tabBarActiveTintColor: theme.colors.accent,
+  tabBarInactiveTintColor: theme.colors.icon,
 });
 
 export default function BottomNav() {

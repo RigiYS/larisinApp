@@ -137,12 +137,16 @@ const TransactionsScreen = () => {
     <View style={styles.container}>
       <Text style={styles.header}>Transaksi Penjualan</Text>
 
-      <TextInput
-        placeholder="Kamu nyari produk apa?"
-        style={styles.searchInput}
-        value={query}
-        onChangeText={setQuery}
-      />
+      <View style={styles.searchWrapper}>
+        <Icon name="magnify" size={20} color={theme.colors.muted} style={styles.searchIcon} />
+        <TextInput
+          placeholder="Kamu nyari produk apa?"
+          style={styles.searchInput}
+          value={query}
+          onChangeText={setQuery}
+          placeholderTextColor={theme.colors.placeholder}
+        />
+      </View>
 
       <FlatList
         data={products.filter(p => p.name.toLowerCase().includes(query.toLowerCase()))}
@@ -156,11 +160,11 @@ const TransactionsScreen = () => {
 
             <View style={styles.cartActions}>
               <TouchableOpacity onPress={() => removeFromCart(item.id)}>
-                <Icon name="minus-circle" size={22} color="#E94F37" />
+                <Icon name="minus-circle" size={22} color={theme.colors.danger} />
               </TouchableOpacity>
               <Text style={styles.qty}>{cart[item.id] || 0}</Text>
               <TouchableOpacity onPress={() => addToCart(item.id)}>
-                <Icon name="plus-circle" size={22} color="#4A90E2" />
+                <Icon name="plus-circle" size={22} color={theme.colors.accent} />
               </TouchableOpacity>
             </View>
           </View>
@@ -217,41 +221,43 @@ export default TransactionsScreen;
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: theme.colors.background, padding: 15 },
-  header: { fontSize: 22, fontWeight: '700', marginVertical: 10, color: '#333' },
+  header: { fontSize: 22, fontWeight: '700', marginVertical: 10, color: theme.colors.text },
   card: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: theme.colors.card,
     margin: 8,
     borderRadius: 12,
     padding: 10,
   },
-  name: { fontWeight: '600', fontSize: 16, color: '#333' },
-  price: { color: '#4A90E2', fontWeight: '600', marginVertical: 4 },
-  stock: { color: '#888', fontSize: 13 },
+  name: { fontWeight: '600', fontSize: 16, color: theme.colors.text },
+  price: { color: theme.colors.accent, fontWeight: '600', marginVertical: 4 },
+  stock: { color: theme.colors.muted, fontSize: 13 },
   cartActions: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginTop: 6,
   },
-  qty: { fontSize: 16, fontWeight: '700', color: '#333' },
+  qty: { fontSize: 16, fontWeight: '700', color: theme.colors.text },
   listContent: { paddingBottom: 120 },
-  searchInput: { backgroundColor: '#fff', padding: 8, borderRadius: 8, marginBottom: 8 },
+  searchWrapper: { flexDirection: 'row', alignItems: 'center', backgroundColor: theme.colors.card, paddingHorizontal: 10, borderRadius: 8, marginBottom: 8 },
+  searchIcon: { marginRight: 8 },
+  searchInput: { flex: 1, paddingVertical: 8 },
   footer: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: '#fff',
+    backgroundColor: theme.colors.card,
     padding: 16,
     borderTopWidth: 1,
-    borderColor: '#ddd',
+    borderColor: theme.colors.border,
     flexDirection: 'row',
     justifyContent: 'space-between',
   },
-  totalText: { fontSize: 18, fontWeight: '700', color: '#333' },
+  totalText: { fontSize: 18, fontWeight: '700', color: theme.colors.text },
   btnCheckout: {
-    backgroundColor: '#4A90E2',
+    backgroundColor: theme.colors.accent,
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderRadius: 8,
@@ -264,7 +270,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   receiptBox: {
-    backgroundColor: '#fff',
+    backgroundColor: theme.colors.card,
     borderRadius: 12,
     padding: 20,
     width: '90%',
@@ -276,20 +282,20 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginVertical: 4,
   },
-  itemText: { color: '#333', fontSize: 15 },
-  itemPrice: { fontWeight: '600', color: '#4A90E2' },
+  itemText: { color: theme.colors.text, fontSize: 15 },
+  itemPrice: { fontWeight: '600', color: theme.colors.accent },
   receiptDivider: {
     borderBottomWidth: 1,
-    borderColor: '#ccc',
+    borderColor: theme.colors.border,
     marginVertical: 10,
   },
-  receiptTotal: { fontSize: 18, fontWeight: '700', textAlign: 'right', color: '#000' },
-  receiptDate: { fontSize: 13, color: '#666', textAlign: 'right', marginTop: 6 },
+  receiptTotal: { fontSize: 18, fontWeight: '700', textAlign: 'right', color: theme.colors.text },
+  receiptDate: { fontSize: 13, color: theme.colors.placeholder, textAlign: 'right', marginTop: 6 },
   btnClose: {
-    backgroundColor: '#4A90E2',
+    backgroundColor: theme.colors.accent,
     marginTop: 15,
     padding: 10,
     borderRadius: 8,
   },
-  btnCloseText: { textAlign: 'center', color: '#fff', fontWeight: '700' },
+  btnCloseText: { textAlign: 'center', color: theme.colors.card, fontWeight: '700' },
 });
