@@ -18,7 +18,7 @@ const theme = {
     border: '#dddddd',
     inputBackground: '#F1F1F1',
     placeholder: '#666666',
-    icon: '#8e8e93',
+    icon: '#ffffffff',
     shadow: 'rgba(15,15,15,0.08)',
     // overlay color for modals
     overlay: 'rgba(0,0,0,0.5)'

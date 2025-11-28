@@ -242,7 +242,7 @@ const styles = StyleSheet.create({
   },
   fab: {
     position: 'absolute',
-    bottom: 20,
+    bottom: 100,
     right: 20,
     backgroundColor: theme.colors.accent,
     width: 60,
@@ -283,7 +283,7 @@ const styles = StyleSheet.create({
   btnSave: { backgroundColor: theme.colors.accent, paddingHorizontal: 18, paddingVertical: 8, borderRadius: 6, justifyContent: 'center', alignItems: 'center' },
   btnTextCancel: { color: theme.colors.placeholder, fontWeight: '600' },
   btnTextSave: { color: theme.colors.card, fontWeight: '700' },
-  listContent: { paddingBottom: 100 },
+  listContent: { paddingBottom: 180 },
   searchWrapper: { flexDirection: 'row', alignItems: 'center', backgroundColor: theme.colors.card, paddingHorizontal: 10, borderRadius: 8, marginBottom: 8 },
   searchIcon: { marginRight: 8 },
   searchInput: { flex: 1, paddingVertical: 8 },

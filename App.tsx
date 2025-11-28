@@ -1,16 +1,39 @@
 import React, { useState } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import BottomNav from './src/navigation/BottomNav';
-import SplashScreen from './src/screens/SplashScreen';
+import LoginScreen from './src/screens/LoginScreen';
+import RegisterScreen from './src/screens/RegisterScreen';
 
 export default function App() {
-  const [showSplash, setShowSplash] = useState(true);
+  const [authenticated, setAuthenticated] = useState(false);
 
-  return showSplash ? (
-    <SplashScreen onFinish={() => setShowSplash(false)} />
-  ) : (
+  const Stack = createNativeStackNavigator();
+
+  return (
     <NavigationContainer>
-      <BottomNav />
+      {authenticated ? (
+        <BottomNav />
+      ) : (
+        <Stack.Navigator screenOptions={{ headerShown: false }}>
+          <Stack.Screen name="Login">
+            {({ navigation }) => (
+              <LoginScreen
+                onLoginSuccess={() => setAuthenticated(true)}
+                goToRegister={() => navigation.navigate('Register')}
+              />
+            )}
+          </Stack.Screen>
+          <Stack.Screen name="Register">
+            {({ navigation }) => (
+              <RegisterScreen
+                onRegisterSuccess={() => setAuthenticated(true)}
+                goToLogin={() => navigation.navigate('Login')}
+              />
+            )}
+          </Stack.Screen>
+        </Stack.Navigator>
+      )}
     </NavigationContainer>
   );
 }
