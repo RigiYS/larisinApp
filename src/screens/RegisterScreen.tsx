@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, StyleSheet, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, TextInput, StyleSheet, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
 import theme from '../theme';
+import { signUp } from '../services/authService';
 
 interface Props {
   onRegisterSuccess?: () => void;
@@ -11,13 +12,24 @@ const RegisterScreen: React.FC<Props> = ({ onRegisterSuccess, goToLogin }) => {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  const handleRegister = () => {
+  const handleRegister = async () => {
     if (!name || !email || !password) {
       Alert.alert('Validasi', 'Semua kolom wajib diisi');
       return;
     }
-    onRegisterSuccess && onRegisterSuccess();
+
+    setLoading(true);
+    try {
+      await signUp(email, password, name);
+      Alert.alert('Sukses', 'Pendaftaran berhasil, silakan login');
+      onRegisterSuccess && onRegisterSuccess();
+    } catch (error: any) {
+      Alert.alert('Error', error.message || 'Gagal mendaftar');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -49,8 +61,12 @@ const RegisterScreen: React.FC<Props> = ({ onRegisterSuccess, goToLogin }) => {
         onChangeText={setPassword}
       />
 
-      <TouchableOpacity style={styles.btnPrimary} onPress={handleRegister}>
-        <Text style={styles.btnPrimaryText}>Daftar</Text>
+      <TouchableOpacity style={styles.btnPrimary} onPress={handleRegister} disabled={loading}>
+        {loading ? (
+          <ActivityIndicator color={theme.colors.card} />
+        ) : (
+          <Text style={styles.btnPrimaryText}>Daftar</Text>
+        )}
       </TouchableOpacity>
 
       <TouchableOpacity style={styles.btnLink} onPress={goToLogin}>

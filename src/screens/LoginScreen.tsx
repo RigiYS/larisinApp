@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, StyleSheet, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, TextInput, StyleSheet, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
 import theme from '../theme';
+import { signIn } from '../services/authService';
 
 interface Props {
   onLoginSuccess?: () => void;
@@ -10,13 +11,24 @@ interface Props {
 const LoginScreen: React.FC<Props> = ({ onLoginSuccess, goToRegister }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  const handleLogin = () => {
+  const handleLogin = async () => {
     if (!email || !password) {
       Alert.alert('Validasi', 'Email dan kata sandi wajib diisi');
       return;
     }
-    onLoginSuccess && onLoginSuccess();
+
+    setLoading(true);
+    try {
+      await signIn(email, password);
+      Alert.alert('Sukses', 'Login berhasil');
+      onLoginSuccess && onLoginSuccess();
+    } catch (error: any) {
+      Alert.alert('Error', error.message || 'Gagal login');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -41,8 +53,12 @@ const LoginScreen: React.FC<Props> = ({ onLoginSuccess, goToRegister }) => {
         onChangeText={setPassword}
       />
 
-      <TouchableOpacity style={styles.btnPrimary} onPress={handleLogin}>
-        <Text style={styles.btnPrimaryText}>Masuk</Text>
+      <TouchableOpacity style={styles.btnPrimary} onPress={handleLogin} disabled={loading}>
+        {loading ? (
+          <ActivityIndicator color={theme.colors.card} />
+        ) : (
+          <Text style={styles.btnPrimaryText}>Masuk</Text>
+        )}
       </TouchableOpacity>
 
       <TouchableOpacity style={styles.btnLink} onPress={goToRegister}>

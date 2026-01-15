@@ -10,7 +10,6 @@ import Animated, {
 
 import theme from '../theme';
 
-// Screens
 import HomeScreen from '../screens/HomeScreen';
 import ProductsScreen from '../screens/ProductsScreen';
 import TransactionsScreen from '../screens/TransactionScreen';

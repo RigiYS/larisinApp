@@ -11,27 +11,17 @@ import {
   ScrollView,
 } from 'react-native';
 import theme from '../theme';
-import axios from 'axios';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
-import eventBus from '../utils/eventBus';
-
-interface Product {
-  id: string;
-  name: string;
-  price: number;
-  stock: number;
-  image: string;
-}
-
-interface Transaction {
-  id?: string;
-  items: { name: string; price: number; quantity: number }[];
-  total: number;
-  date: string;
-}
-
-const PRODUCTS_API = 'https://690eea50bd0fefc30a0607e8.mockapi.io/products';
-const TRANSACTIONS_API = 'https://691159ac7686c0e9c20d1ec7.mockapi.io/transactions';
+import { firebaseAuth } from '../services/firebase';
+import {
+  onProductsChanged,
+  updateProduct,
+  Product,
+} from '../services/productService';
+import {
+  addTransaction,
+  Transaction,
+} from '../services/transactionService';
 
 const TransactionsScreen = () => {
   const [products, setProducts] = useState<Product[]>([]);
@@ -42,17 +32,14 @@ const TransactionsScreen = () => {
   const [loading, setLoading] = useState(false);
 
   
-  const fetchProducts = async () => {
-    try {
-      const res = await axios.get(PRODUCTS_API);
-      setProducts(res.data);
-    } catch {
-      Alert.alert('Error', 'Gagal mengambil data produk');
-    }
-  };
-
   useEffect(() => {
-    fetchProducts();
+    const unsubscribe = onProductsChanged(
+      (items) => setProducts(items),
+      () => Alert.alert('Error', 'Gagal mengambil data produk')
+    );
+    return () => {
+      if (unsubscribe) unsubscribe();
+    };
   }, []);
 
   
@@ -87,40 +74,55 @@ const TransactionsScreen = () => {
       return;
     }
 
+    const user = firebaseAuth.currentUser;
+    if (!user) {
+      Alert.alert('Autentikasi', 'Silakan login ulang');
+      return;
+    }
+
     try {
       setLoading(true);
 
       const items = Object.keys(cart).map((id) => {
         const product = products.find((p) => p.id === id)!;
         return {
-          name: product.name,
+          productId: product.id,
+          productName: product.name,
           price: product.price,
           quantity: cart[id],
+          subtotal: product.price * cart[id],
         };
       });
 
-      
+      // Kurangi stok di Firestore
       for (const id of Object.keys(cart)) {
         const product = products.find((p) => p.id === id)!;
         const newStock = product.stock - cart[id];
-        await axios.put(`${PRODUCTS_API}/${id}`, { ...product, stock: newStock });
+        await updateProduct(id, { stock: newStock });
       }
 
-      
-      const newTransaction = {
+      const newTransaction: Omit<Transaction, 'id' | 'createdAt' | 'updatedAt'> = {
+        userId: user.uid,
         items,
-        total,
-        date: new Date().toISOString(),
+        totalAmount: total,
+        status: 'completed',
+        paymentMethod: 'cash',
+        notes: '',
+        receiptUrl: '',
       };
 
-      await axios.post(TRANSACTIONS_API, newTransaction);
-      
-      eventBus.emit('transactions:changed', newTransaction);
-      setReceipt(newTransaction);
+      await addTransaction(newTransaction);
+
+      const now = new Date().toISOString();
+      setReceipt({
+        ...newTransaction,
+        id: 'local',
+        createdAt: now,
+        updatedAt: now,
+      });
       setModalVisible(true);
 
       setCart({});
-      fetchProducts();
     } catch {
       Alert.alert('Error', 'Gagal menyimpan transaksi');
     } finally {
@@ -194,7 +196,7 @@ const TransactionsScreen = () => {
               {receipt?.items.map((item, idx) => (
                 <View key={idx} style={styles.receiptItem}>
                   <Text style={styles.itemText}>
-                    {item.name} x {item.quantity}
+                    {item.productName} x {item.quantity}
                   </Text>
                   <Text style={styles.itemPrice}>{formatRupiah(item.price * item.quantity)}</Text>
                 </View>
@@ -202,8 +204,8 @@ const TransactionsScreen = () => {
             </ScrollView>
 
             <View style={styles.receiptDivider} />
-            <Text style={styles.receiptTotal}>Total: {formatRupiah(receipt?.total || 0)}</Text>
-            <Text style={styles.receiptDate}>{formatDate(receipt?.date || '')}</Text>
+            <Text style={styles.receiptTotal}>Total: {formatRupiah(receipt?.totalAmount || 0)}</Text>
+            <Text style={styles.receiptDate}>{formatDate(receipt?.createdAt || '')}</Text>
 
             <TouchableOpacity
               style={styles.btnClose}

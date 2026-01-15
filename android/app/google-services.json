@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "248337385332",
+    "project_id": "larisin-fae8c",
+    "storage_bucket": "larisin-fae8c.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:248337385332:android:cc254c3692abee061a0e21",
+        "android_client_info": {
+          "package_name": "com.rigi.larisin"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCjPEtIpX6vEZo9tsYhT-5bVjwhLokN4hE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -1,6 +1,7 @@
 apply plugin: "com.android.application"
 apply plugin: "org.jetbrains.kotlin.android"
 apply plugin: "com.facebook.react"
+apply plugin: "com.google.gms.google-services"  // Google Services plugin
 
 // Copy icon fonts from react-native-vector-icons into android assets during build
 apply from: "../../node_modules/react-native-vector-icons/fonts.gradle"
@@ -82,7 +83,7 @@ android {
 
     namespace "com.larisin"
     defaultConfig {
-        applicationId "com.larisin"
+        applicationId "com.rigi.larisin"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1

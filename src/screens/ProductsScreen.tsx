@@ -11,7 +11,13 @@ import {
   Alert,
   ActivityIndicator,
 } from 'react-native';
-import axios from 'axios';
+import {
+  onProductsChanged,
+  addProduct as addProductDb,
+  updateProduct as updateProductDb,
+  deleteProduct as deleteProductDb,
+  Product as ProductDb,
+} from '../services/productService';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import theme from '../theme';
 
@@ -22,8 +28,6 @@ interface Product {
   stock: number;
   image: string;
 }
-
-const API_URL = 'https://690eea50bd0fefc30a0607e8.mockapi.io/products';
 
 const ProductsScreen = () => {
   const [products, setProducts] = useState<Product[]>([]);
@@ -39,21 +43,34 @@ const ProductsScreen = () => {
   });
 
   
-  const fetchProducts = async () => {
+  const fetchProducts = () => {
     setLoading(true);
-    try {
-      const res = await axios.get(API_URL);
-      setProducts(res.data || []);
-    } catch (err) {
-      console.log(err);
-      Alert.alert('Error', 'Gagal memuat produk');
-    } finally {
-      setLoading(false);
-    }
+    const unsubscribe = onProductsChanged(
+      (items) => {
+        // Map to local Product interface if needed
+        const mapped: Product[] = items.map((p) => ({
+          id: p.id,
+          name: p.name,
+          price: p.price,
+          stock: p.stock,
+          image: p.image || '',
+        }));
+        setProducts(mapped);
+        setLoading(false);
+      },
+      () => {
+        Alert.alert('Error', 'Gagal memuat produk');
+        setLoading(false);
+      }
+    );
+    return unsubscribe;
   };
 
   useEffect(() => {
-    fetchProducts();
+    const unsub = fetchProducts();
+    return () => {
+      if (typeof unsub === 'function') unsub();
+    };
   }, []);
 
   
@@ -72,17 +89,17 @@ const ProductsScreen = () => {
       };
 
       if (selectedProduct) {
-        await axios.put(`${API_URL}/${selectedProduct.id}`, payload);
+        await updateProductDb(selectedProduct.id, payload);
         Alert.alert('Sukses', 'Produk berhasil diperbarui');
       } else {
-        await axios.post(API_URL, payload);
+        await addProductDb(payload as Omit<ProductDb, 'id'>);
         Alert.alert('Sukses', 'Produk berhasil ditambahkan');
       }
 
       setModalVisible(false);
       setSelectedProduct(null);
       setForm({ name: '', price: '', stock: '', image: '' });
-      fetchProducts();
+      // Realtime listener akan memperbarui otomatis
     } catch {
       Alert.alert('Error', 'Gagal menyimpan produk');
     }
@@ -91,8 +108,8 @@ const ProductsScreen = () => {
   
   const handleDelete = async (id: string) => {
     try {
-      await axios.delete(`${API_URL}/${id}`);
-      fetchProducts();
+      await deleteProductDb(id);
+      // Realtime listener akan memperbarui otomatis
       Alert.alert('Sukses', 'Produk berhasil dihapus');
     } catch {
       Alert.alert('Error', 'Gagal menghapus produk');

@@ -1,53 +1,58 @@
 import React, { useEffect, useState } from "react";
-import { View, Text, StyleSheet, FlatList, Modal, TouchableOpacity, ScrollView } from "react-native";
+import { View, Text, StyleSheet, FlatList, Alert } from "react-native";
 import theme from '../theme';
-import axios from "axios";
-import eventBus from '../utils/eventBus';
-
-interface Transaction {
-  id: string;
-  total: number;
-  date: string;
-  items?: { name: string; price: number; quantity: number }[];
-}
+import { firebaseAuth } from '../services/firebase';
+import {
+  onUserTransactionsChanged,
+  getTotalTransactionAmount,
+  Transaction,
+} from '../services/transactionService';
 
 export default function HomeScreen() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [dailyRevenue, setDailyRevenue] = useState(0);
   const [weeklyRevenue, setWeeklyRevenue] = useState(0);
-  const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
-
-  const fetchTransactions = async () => {
-    const res = await axios.get("https://691159ac7686c0e9c20d1ec7.mockapi.io/transactions");
-    const data = res.data;
-    setTransactions(data);
-
-    
-    const today = new Date().toISOString().split("T")[0];
-    const weekAgo = new Date();
-    weekAgo.setDate(weekAgo.getDate() - 7);
-
-    const daily = data
-      .filter((t: Transaction) => t.date.startsWith(today))
-      .reduce((sum: number, t: Transaction) => sum + t.total, 0);
-
-    const weekly = data
-      .filter((t: Transaction) => new Date(t.date) >= weekAgo)
-      .reduce((sum: number, t: Transaction) => sum + t.total, 0);
-
-    setDailyRevenue(daily);
-    setWeeklyRevenue(weekly);
-  };
 
   useEffect(() => {
-    fetchTransactions();
-  }, []);
+    const user = firebaseAuth.currentUser;
+    if (!user) {
+      Alert.alert('Autentikasi', 'Silakan login ulang untuk melihat transaksi');
+      return;
+    }
 
-  useEffect(() => {
-    const unsub = eventBus.on('transactions:changed', () => {
-      fetchTransactions();
-    });
-    return () => unsub();
+    // Realtime transaksi user
+    const unsubscribe = onUserTransactionsChanged(
+      user.uid,
+      (data) => {
+        setTransactions(data);
+
+        // Hitung daily & weekly dari data realtime
+        const today = new Date().toISOString().split("T")[0];
+        const weekAgo = new Date();
+        weekAgo.setDate(weekAgo.getDate() - 7);
+
+        const daily = data
+          .filter((t) => t.createdAt.startsWith(today))
+          .reduce((sum, t) => sum + (t.totalAmount || 0), 0);
+
+        const weekly = data
+          .filter((t) => new Date(t.createdAt) >= weekAgo)
+          .reduce((sum, t) => sum + (t.totalAmount || 0), 0);
+
+        setDailyRevenue(daily);
+        setWeeklyRevenue(weekly);
+      },
+      () => {
+        Alert.alert('Error', 'Gagal memuat transaksi');
+      }
+    );
+
+    // Hitung total weekly via query (redundant but keeps logic simple if listener empty)
+    getTotalTransactionAmount(user.uid).then(setWeeklyRevenue).catch(() => {});
+
+    return () => {
+      if (unsubscribe) unsubscribe();
+    };
   }, []);
 
   return (
@@ -66,25 +71,24 @@ export default function HomeScreen() {
 
       <Text style={styles.subtitle}>Riwayat Transaksi</Text>
       <FlatList
-        data={transactions.slice(-5).reverse()}
+        data={transactions.slice(0, 5)}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => (
           <View style={styles.transactionItem}>
             <View style={styles.flexOne}>
-              <Text style={styles.transactionDate}>{new Date(item.date).toLocaleDateString()}</Text>
+              <Text style={styles.transactionDate}>{new Date(item.createdAt).toLocaleDateString()}</Text>
 
-              
               {item.items && item.items.length > 0 && (
                 <View style={styles.transactionDetails}>
                   {item.items.map((it, idx) => (
                     <View key={idx} style={styles.detailRow}>
-                      <Text style={styles.detailName}>{it.name} x{it.quantity}</Text>
+                      <Text style={styles.detailName}>{it.productName} x{it.quantity}</Text>
                       <Text style={styles.detailPrice}>Rp {(it.price * it.quantity).toLocaleString()}</Text>
                     </View>
                   ))}
 
                   <View style={styles.transactionSummary}>
-                    <Text style={styles.receiptTotal}>Total: Rp {item.total?.toLocaleString()}</Text>
+                    <Text style={styles.receiptTotal}>Total: Rp {item.totalAmount?.toLocaleString()}</Text>
                   </View>
                 </View>
               )}
@@ -94,26 +98,6 @@ export default function HomeScreen() {
       />
 
       
-      <Modal visible={!!selectedTransaction} transparent animationType="slide">
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalBox}>
-            <Text style={styles.modalTitle}>Detail Transaksi</Text>
-            <ScrollView style={styles.detailList}>
-              {selectedTransaction?.items?.map((it, idx) => (
-                <View key={idx} style={styles.receiptItem}>
-                  <Text style={styles.itemText}>{it.name} x {it.quantity}</Text>
-                  <Text style={styles.itemPrice}>Rp {(it.price * it.quantity).toLocaleString()}</Text>
-                </View>
-              ))}
-            </ScrollView>
-            <View style={styles.receiptDivider} />
-            <Text style={styles.receiptTotal}>Total: Rp {selectedTransaction?.total?.toLocaleString()}</Text>
-            <TouchableOpacity style={styles.btnClose} onPress={() => setSelectedTransaction(null)}>
-              <Text style={styles.btnTextSave}>Tutup</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
     </View>
   );
 }

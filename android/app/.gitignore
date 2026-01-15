@@ -1,0 +1,6 @@
+# Keep google-services.json private (contains API keys)
+# google-services.json
+
+# Note: Uncomment line above jika tidak ingin commit ke git
+# Untuk development, sebaiknya di-commit agar tim lain bisa langsung pakai
+# Untuk production, simpan di environment variables
