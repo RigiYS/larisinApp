@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { View, Text, StyleSheet, FlatList, Alert } from "react-native";
+import { View, Text, StyleSheet, FlatList, Alert, StatusBar, Platform } from "react-native";
 import theme from '../theme';
 import { firebaseAuth } from '../services/firebase';
 import {
@@ -7,6 +7,7 @@ import {
   getTotalTransactionAmount,
   Transaction,
 } from '../services/transactionService';
+import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
 export default function HomeScreen() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -20,133 +21,385 @@ export default function HomeScreen() {
       return;
     }
 
-    // Realtime transaksi user
     const unsubscribe = onUserTransactionsChanged(
       user.uid,
       (data) => {
-        setTransactions(data);
+        // Sort transaksi dari yang terbaru (Best Practice untuk Dashboard)
+        const sortedData = [...data].sort((a, b) => 
+            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        );
+        setTransactions(sortedData);
 
-        // Hitung daily & weekly dari data realtime
-        const today = new Date().toISOString().split("T")[0];
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const todayStr = today.toISOString().split("T")[0];
         const weekAgo = new Date();
         weekAgo.setDate(weekAgo.getDate() - 7);
 
-        const daily = data
-          .filter((t) => t.createdAt.startsWith(today))
+        const daily = sortedData
+          .filter((t) => t.createdAt && t.createdAt.startsWith(todayStr))
           .reduce((sum, t) => sum + (t.totalAmount || 0), 0);
 
-        const weekly = data
-          .filter((t) => new Date(t.createdAt) >= weekAgo)
+        const weekly = sortedData
+          .filter((t) => t.createdAt && new Date(t.createdAt) >= weekAgo)
           .reduce((sum, t) => sum + (t.totalAmount || 0), 0);
 
         setDailyRevenue(daily);
         setWeeklyRevenue(weekly);
       },
-      () => {
-        Alert.alert('Error', 'Gagal memuat transaksi');
-      }
+      (error) => console.log('Transaction loading:', error.message)
     );
 
-    // Hitung total weekly via query (redundant but keeps logic simple if listener empty)
     getTotalTransactionAmount(user.uid).then(setWeeklyRevenue).catch(() => {});
 
-    return () => {
-      if (unsubscribe) unsubscribe();
-    };
+    return () => { if (unsubscribe) unsubscribe(); };
   }, []);
 
-  return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Dashboard</Text>
-      <View style={styles.cardContainer}>
-        <View style={styles.card}>
-          <Text style={styles.cardLabel}>Pendapatan Hari ini</Text>
-          <Text style={styles.cardValue}>Rp {dailyRevenue.toLocaleString()}</Text>
+  // --- COMPONENT BAGIAN HEADER (DASHBOARD) ---
+  const renderHeader = () => (
+    <View style={styles.headerContainer}>
+      <View style={styles.headerTextContainer}>
+        <View>
+          <Text style={styles.greetingText}>Halo, Pemilik Toko 👋</Text>
+          <Text style={styles.headerTitle}>Ringkasan Bisnis</Text>
         </View>
-        <View style={styles.card}>
-          <Text style={styles.cardLabel}>Pendapatan Minggu ini</Text>
-          <Text style={styles.cardValue}>Rp {weeklyRevenue.toLocaleString()}</Text>
+        <View style={styles.profileBadge}>
+           <Icon name="store" size={20} color="#FFF" />
         </View>
       </View>
 
-      <Text style={styles.subtitle}>Riwayat Transaksi</Text>
-      <FlatList
-        data={transactions.slice(0, 5)}
-        keyExtractor={(item) => item.id}
-        renderItem={({ item }) => (
-          <View style={styles.transactionItem}>
-            <View style={styles.flexOne}>
-              <Text style={styles.transactionDate}>{new Date(item.createdAt).toLocaleDateString()}</Text>
-
-              {item.items && item.items.length > 0 && (
-                <View style={styles.transactionDetails}>
-                  {item.items.map((it, idx) => (
-                    <View key={idx} style={styles.detailRow}>
-                      <Text style={styles.detailName}>{it.productName} x{it.quantity}</Text>
-                      <Text style={styles.detailPrice}>Rp {(it.price * it.quantity).toLocaleString()}</Text>
-                    </View>
-                  ))}
-
-                  <View style={styles.transactionSummary}>
-                    <Text style={styles.receiptTotal}>Total: Rp {item.totalAmount?.toLocaleString()}</Text>
-                  </View>
-                </View>
-              )}
-            </View>
+      {/* Modern Dashboard Cards */}
+      <View style={styles.statsRow}>
+        {/* Daily Card */}
+        <View style={[styles.statCard, styles.shadowSubtle]}>
+          <View style={[styles.iconCircle, { backgroundColor: theme.colors.primary + '15' }]}>
+            <Icon name="cash-fast" size={22} color={theme.colors.primary} />
           </View>
-        )}
-      />
+          <View>
+            <Text style={styles.statLabel}>Omzet Hari Ini</Text>
+            <Text style={styles.statValue}>Rp {dailyRevenue.toLocaleString('id-ID')}</Text>
+          </View>
+        </View>
 
+        {/* Weekly Card */}
+        <View style={[styles.statCard, styles.shadowSubtle]}>
+          <View style={[styles.iconCircle, { backgroundColor: theme.colors.secondary + '15' }]}>
+            <Icon name="chart-timeline-variant" size={22} color={theme.colors.secondary} />
+          </View>
+          <View>
+            <Text style={styles.statLabel}>Minggu Ini</Text>
+            <Text style={styles.statValue}>Rp {weeklyRevenue.toLocaleString('id-ID')}</Text>
+          </View>
+        </View>
+      </View>
+
+      <View style={styles.sectionHeader}>
+        <Text style={styles.sectionTitle}>Riwayat Transaksi</Text>
+        <View style={styles.badgeCount}>
+            <Text style={styles.badgeText}>{transactions.length}</Text>
+        </View>
+      </View>
+    </View>
+  );
+
+  // --- COMPONENT EMPTY STATE ---
+  const renderEmpty = () => (
+    <View style={styles.emptyContainer}>
+      <View style={styles.emptyIconBg}>
+        <Icon name="receipt" size={40} color={theme.colors.textMuted} />
+      </View>
+      <Text style={styles.emptyTitle}>Belum Ada Penjualan</Text>
+      <Text style={styles.emptySubtitle}>Transaksi baru akan muncul di sini secara real-time.</Text>
+    </View>
+  );
+
+  // --- COMPONENT ITEM TRANSAKSI ---
+  const renderTransactionItem = ({ item }: { item: Transaction }) => (
+    <View style={[styles.transactionCard, styles.shadowSubtle]}>
+      {/* Top Row: Date & Status */}
+      <View style={styles.cardTopRow}>
+        <View style={styles.dateBadge}>
+          <Icon name="calendar-month-outline" size={14} color={theme.colors.textMuted} />
+          <Text style={styles.dateText}>
+            {new Date(item.createdAt).toLocaleDateString('id-ID', {
+              day: 'numeric', month: 'short', hour: '2-digit', minute:'2-digit'
+            })}
+          </Text>
+        </View>
+        <View style={styles.statusPill}>
+            <Icon name="check-circle" size={12} color="#10B981" />
+            <Text style={styles.statusText}>Sukses</Text>
+        </View>
+      </View>
+
+      {/* Middle: Products */}
+      <View style={styles.productList}>
+        {item.items?.map((product, index) => (
+          <View key={index} style={styles.productRow}>
+            <Text style={styles.productName} numberOfLines={1}>
+              {product?.productName || 'Produk Tanpa Nama'}
+            </Text>
+            <Text style={styles.productQty}>x{product?.quantity}</Text>
+          </View>
+        ))}
+      </View>
+
+      {/* Bottom: Total Divider */}
+      <View style={styles.divider} />
+      <View style={styles.cardBottomRow}>
+        <Text style={styles.totalLabel}>Total Bayar</Text>
+        <Text style={styles.totalAmount}>Rp {(item.totalAmount || 0).toLocaleString('id-ID')}</Text>
+      </View>
+    </View>
+  );
+
+  return (
+    <View style={styles.container}>
+      <StatusBar barStyle="dark-content" backgroundColor={theme.colors.background} />
       
+      <FlatList
+        data={transactions}
+        keyExtractor={(item) => item.id || Math.random().toString()}
+        renderItem={renderTransactionItem}
+        ListHeaderComponent={renderHeader}
+        ListEmptyComponent={renderEmpty}
+        contentContainerStyle={styles.listContent}
+        showsVerticalScrollIndicator={false}
+      />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: theme.colors.background, padding: 16 },
-  title: { fontSize: 24, fontWeight: "700", marginBottom: 16 },
-  cardContainer: { flexDirection: "row", justifyContent: "space-between" },
-  card: {
-    backgroundColor: theme.colors.card,
+  // Layout Dasar
+  container: {
     flex: 1,
-    margin: 6,
-    padding: 16,
+    backgroundColor: '#F8F9FA', // Background sedikit abu-abu muda (Modern Standard)
+  },
+  listContent: {
+    paddingBottom: 100,
+  },
+  shadowSubtle: {
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.05, // Shadow sangat tipis (Premium feel)
+    shadowRadius: 10,
+    elevation: 3,
+  },
+
+  // Header Styles
+  headerContainer: {
+    paddingHorizontal: 20,
+    paddingTop: Platform.OS === 'android' ? 20 : 60,
+    paddingBottom: 10,
+    backgroundColor: '#FFF',
+    borderBottomLeftRadius: 30,
+    borderBottomRightRadius: 30,
+    marginBottom: 20,
+    // Header punya shadow sendiri agar terpisah dari list
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.03,
+    shadowRadius: 15,
+    elevation: 2,
+  },
+  headerTextContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  greetingText: {
+    fontSize: 14,
+    color: theme.colors.textMuted,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  headerTitle: {
+    fontSize: 24,
+    fontWeight: '800',
+    color: '#1A1A1A',
+    letterSpacing: -0.5,
+  },
+  profileBadge: {
+    width: 40,
+    height: 40,
+    backgroundColor: theme.colors.primary,
     borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  cardLabel: { fontSize: 14, color: theme.colors.muted },
-  cardValue: { fontSize: 18, fontWeight: "700", color: theme.colors.text, marginTop: 4 },
-  subtitle: { marginTop: 20, fontSize: 18, fontWeight: "600" },
-  transactionItem: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    backgroundColor: theme.colors.card,
-    padding: 12,
+
+  // Stats Cards
+  statsRow: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 24,
+  },
+  statCard: {
+    flex: 1,
+    backgroundColor: '#FFF',
+    borderRadius: 20,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#F0F0F0',
+    justifyContent: 'space-between',
+    minHeight: 110,
+  },
+  iconCircle: {
+    width: 36,
+    height: 36,
     borderRadius: 10,
-    marginVertical: 6,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 12,
   },
-  transactionDate: { color: theme.colors.placeholder },
-  transactionTotal: { fontWeight: "700", color: theme.colors.text },
-  transactionDetails: { marginTop: 8, paddingTop: 8, borderTopWidth: 1, borderTopColor: '#f0f0f0' },
-  detailRow: { flexDirection: 'row', justifyContent: 'space-between', marginVertical: 4 },
-  detailName: { color: theme.colors.text, fontSize: 13 },
-  detailPrice: { color: theme.colors.accent, fontWeight: '600' },
-  detailContainer: { marginVertical: 6 },
-  detailMain: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  detailTotal: { color: theme.colors.text, fontWeight: '700' },
-  detailSub: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 2 },
-  detailUnit: { color: theme.colors.muted, fontSize: 12 },
-  detailNote: { color: theme.colors.placeholder, fontSize: 12 },
-  flexOne: { flex: 1 },
-  transactionSummary: { marginTop: 6, alignItems: 'flex-end' },
-  modalOverlay: { flex: 1, backgroundColor: '#00000066', justifyContent: 'center', alignItems: 'center' },
-  modalBox: { width: '90%', backgroundColor: theme.colors.card, borderRadius: 12, padding: 16 },
-  modalTitle: { fontSize: 18, fontWeight: '700', marginBottom: 8, textAlign: 'center' },
-  receiptItem: { flexDirection: 'row', justifyContent: 'space-between', marginVertical: 6 },
-  itemText: { color: theme.colors.text },
-  itemPrice: { color: theme.colors.accent, fontWeight: '600' },
-  receiptDivider: { borderBottomWidth: 1, borderColor: theme.colors.border, marginVertical: 8 },
-  receiptTotal: { textAlign: 'right', fontWeight: '700', marginTop: 6 },
-  btnClose: { marginTop: 12, backgroundColor: theme.colors.accent, padding: 10, borderRadius: 8 },
-  btnTextSave: { color: theme.colors.card, textAlign: 'center', fontWeight: '700' },
-  detailList: { maxHeight: 300 },
+  statLabel: {
+    fontSize: 12,
+    color: theme.colors.textMuted,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  statValue: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#1A1A1A',
+  },
+
+  // Section Header
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#1A1A1A',
+    marginRight: 8,
+  },
+  badgeCount: {
+    backgroundColor: '#F3F4F6',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
+  },
+  badgeText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: theme.colors.textMuted,
+  },
+
+  // Transaction Item Styles
+  transactionCard: {
+    backgroundColor: '#FFF',
+    marginHorizontal: 20,
+    marginBottom: 12,
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#F5F5F5',
+  },
+  cardTopRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  dateBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#F9FAFB',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  dateText: {
+    fontSize: 12,
+    color: theme.colors.textMuted,
+    fontWeight: '500',
+  },
+  statusPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#ECFDF5', // Light emerald green
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 100,
+  },
+  statusText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#10B981', // Darker emerald
+  },
+  productList: {
+    marginBottom: 12,
+  },
+  productRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 4,
+  },
+  productName: {
+    fontSize: 14,
+    color: '#374151',
+    fontWeight: '500',
+    flex: 1,
+    marginRight: 10,
+  },
+  productQty: {
+    fontSize: 14,
+    color: '#6B7280',
+    fontWeight: '600',
+  },
+  divider: {
+    height: 1,
+    backgroundColor: '#F3F4F6',
+    marginBottom: 12,
+  },
+  cardBottomRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  totalLabel: {
+    fontSize: 13,
+    color: theme.colors.textMuted,
+    fontWeight: '500',
+  },
+  totalAmount: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: theme.colors.primary,
+  },
+
+  // Empty State
+  emptyContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 60,
+    paddingHorizontal: 40,
+  },
+  emptyIconBg: {
+    width: 80,
+    height: 80,
+    backgroundColor: '#F3F4F6',
+    borderRadius: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  emptyTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#1A1A1A',
+    marginBottom: 8,
+  },
+  emptySubtitle: {
+    fontSize: 14,
+    color: theme.colors.textMuted,
+    textAlign: 'center',
+    lineHeight: 20,
+  },
 });

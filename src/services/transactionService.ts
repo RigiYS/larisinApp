@@ -70,9 +70,14 @@ export const addTransaction = async (
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     });
+    console.log('Transaction created:', docRef.id);
     return docRef.id;
   } catch (error: any) {
-    throw new Error(error.message || 'Gagal membuat transaksi');
+    console.error('Error creating transaction:', error);
+    const errorMsg = error.code === 'permission-denied' 
+      ? 'Anda tidak memiliki izin untuk membuat transaksi. Pastikan Firestore sudah dikonfigurasi.'
+      : error.message || 'Gagal membuat transaksi';
+    throw new Error(errorMsg);
   }
 };
 
@@ -113,22 +118,24 @@ export const getTotalTransactionAmount = async (
   endDate?: Date
 ): Promise<number> => {
   try {
-    let query: any = firebaseDb
+    // Get all transactions for user first (no complex index needed)
+    const snapshot = await firebaseDb
       .collection(COLLECTION)
       .where('userId', '==', userId)
-      .where('status', '==', 'completed');
-
-    if (startDate) {
-      query = query.where('createdAt', '>=', startDate.toISOString());
-    }
-    if (endDate) {
-      query = query.where('createdAt', '<=', endDate.toISOString());
-    }
-
-    const snapshot = await query.get();
+      .get();
+    
     let total = 0;
-    snapshot.docs.forEach((doc: { data: () => { (): any; new(): any; totalAmount: any; }; }) => {
-      total += doc.data().totalAmount || 0;
+    snapshot.docs.forEach((doc) => {
+      const data = doc.data();
+      
+      // Filter by status
+      if (data.status !== 'completed') return;
+      
+      // Filter by date range
+      if (startDate && new Date(data.createdAt) < startDate) return;
+      if (endDate && new Date(data.createdAt) > endDate) return;
+      
+      total += data.totalAmount || 0;
     });
     return total;
   } catch (error: any) {
@@ -147,13 +154,14 @@ export const onUserTransactionsChanged = (
   return firebaseDb
     .collection(COLLECTION)
     .where('userId', '==', userId)
-    .orderBy('createdAt', 'desc')
     .onSnapshot(
       (snapshot) => {
         const transactions = snapshot.docs.map((doc) => ({
           id: doc.id,
           ...doc.data(),
         } as Transaction));
+        // Sort client-side to avoid composite index requirement
+        transactions.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
         callback(transactions);
       },
       (error) => {

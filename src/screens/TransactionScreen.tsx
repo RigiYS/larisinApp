@@ -1,3 +1,5 @@
+/* eslint-disable react-native/no-inline-styles */
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import React, { useEffect, useState } from 'react';
 import {
   View,
@@ -8,7 +10,12 @@ import {
   TextInput,
   Alert,
   Modal,
-  ScrollView,
+  Image,
+  StatusBar,
+  Dimensions,
+  SafeAreaView,
+  KeyboardAvoidingView,
+  Platform
 } from 'react-native';
 import theme from '../theme';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
@@ -23,6 +30,10 @@ import {
   Transaction,
 } from '../services/transactionService';
 
+const { width } = Dimensions.get('window');
+const CARD_MARGIN = 12;
+const CARD_WIDTH = (width / 2) - (CARD_MARGIN * 2);
+
 const TransactionsScreen = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [cart, setCart] = useState<{ [key: string]: number }>({});
@@ -31,26 +42,24 @@ const TransactionsScreen = () => {
   const [receipt, setReceipt] = useState<Transaction | null>(null);
   const [loading, setLoading] = useState(false);
 
-  
   useEffect(() => {
     const unsubscribe = onProductsChanged(
       (items) => setProducts(items),
       () => Alert.alert('Error', 'Gagal mengambil data produk')
     );
-    return () => {
-      if (unsubscribe) unsubscribe();
-    };
+    return () => { if (unsubscribe) unsubscribe(); };
   }, []);
 
-  
+  // --- LOGIC CART ---
   const addToCart = (id: string) => {
-    setCart((prev) => ({
-      ...prev,
-      [id]: (prev[id] || 0) + 1,
-    }));
+    const product = products.find(p => p.id === id);
+    if (product && (cart[id] || 0) < product.stock) {
+        setCart((prev) => ({ ...prev, [id]: (prev[id] || 0) + 1 }));
+    } else {
+        Alert.alert('Stok Habis', 'Stok produk tidak mencukupi.');
+    }
   };
 
-  
   const removeFromCart = (id: string) => {
     setCart((prev) => {
       const newCart = { ...prev };
@@ -60,29 +69,22 @@ const TransactionsScreen = () => {
     });
   };
 
-  
   const total = Object.keys(cart).reduce((sum, id) => {
     const product = products.find((p) => p.id === id);
     if (!product) return sum;
     return sum + product.price * cart[id];
   }, 0);
 
-  
-  const handleCheckout = async () => {
-    if (Object.keys(cart).length === 0) {
-      Alert.alert('Kosong', 'Keranjang masih kosong');
-      return;
-    }
+  const totalQty = Object.values(cart).reduce((a, b) => a + b, 0);
 
+  const handleCheckout = async () => {
+    if (Object.keys(cart).length === 0) return;
+    
     const user = firebaseAuth.currentUser;
-    if (!user) {
-      Alert.alert('Autentikasi', 'Silakan login ulang');
-      return;
-    }
+    if (!user) return Alert.alert('Autentikasi', 'Silakan login ulang');
 
     try {
       setLoading(true);
-
       const items = Object.keys(cart).map((id) => {
         const product = products.find((p) => p.id === id)!;
         return {
@@ -94,210 +96,584 @@ const TransactionsScreen = () => {
         };
       });
 
-      // Kurangi stok di Firestore
+      // Update Stok
       for (const id of Object.keys(cart)) {
         const product = products.find((p) => p.id === id)!;
-        const newStock = product.stock - cart[id];
-        await updateProduct(id, { stock: newStock });
+        await updateProduct(id, { stock: product.stock - cart[id] });
       }
 
-      const newTransaction: Omit<Transaction, 'id' | 'createdAt' | 'updatedAt'> = {
+      const newTransaction: any = {
         userId: user.uid,
         items,
         totalAmount: total,
         status: 'completed',
         paymentMethod: 'cash',
-        notes: '',
-        receiptUrl: '',
+        createdAt: new Date().toISOString(),
       };
 
       await addTransaction(newTransaction);
-
-      const now = new Date().toISOString();
-      setReceipt({
-        ...newTransaction,
-        id: 'local',
-        createdAt: now,
-        updatedAt: now,
-      });
+      setReceipt({ ...newTransaction, id: 'local' });
       setModalVisible(true);
-
       setCart({});
-    } catch {
-      Alert.alert('Error', 'Gagal menyimpan transaksi');
+    } catch (e) {
+      Alert.alert('Error', 'Gagal memproses transaksi');
     } finally {
       setLoading(false);
     }
   };
 
-  
   const formatRupiah = (num: number) => `Rp ${num.toLocaleString('id-ID')}`;
-  const formatDate = (date: string) =>
-    new Date(date).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' });
+
+  // --- RENDER ITEMS ---
+  const renderProductItem = ({ item }: { item: Product }) => {
+    const qty = cart[item.id] || 0;
+    const isOutOfStock = item.stock <= 0;
+    
+    return (
+      <View style={styles.cardContainer}>
+        <View style={[styles.card, isOutOfStock && styles.cardDisabled]}>
+            {/* Badge Qty */}
+            {qty > 0 && (
+            <View style={styles.badgeQty}>
+                <Text style={styles.badgeQtyText}>{qty}</Text>
+            </View>
+            )}
+
+            <View style={styles.imageWrapper}>
+                 <Image source={{ uri: item.image }} style={[styles.productImage, isOutOfStock && { opacity: 0.5 }]} />
+                 {isOutOfStock && (
+                     <View style={styles.outOfStockOverlay}>
+                         <Text style={styles.outOfStockText}>Habis</Text>
+                     </View>
+                 )}
+            </View>
+
+            <View style={styles.cardContent}>
+                <Text style={styles.productName} numberOfLines={1}>{item.name}</Text>
+                <Text style={styles.productPrice}>{formatRupiah(item.price)}</Text>
+                
+                <View style={styles.stockRow}>
+                    <Icon name="package-variant-closed" size={12} color="#9CA3AF" />
+                    <Text style={styles.productStock}>Stok: {item.stock}</Text>
+                </View>
+
+                {/* Controls */}
+                <View style={styles.actionContainer}>
+                    {qty > 0 ? (
+                        <View style={styles.stepper}>
+                            <TouchableOpacity onPress={() => removeFromCart(item.id)} style={styles.stepBtn}>
+                                <Icon name="minus" size={16} color={theme.colors.primary} />
+                            </TouchableOpacity>
+                            <Text style={styles.stepVal}>{qty}</Text>
+                            <TouchableOpacity onPress={() => addToCart(item.id)} style={styles.stepBtn}>
+                                <Icon name="plus" size={16} color={theme.colors.primary} />
+                            </TouchableOpacity>
+                        </View>
+                    ) : (
+                        <TouchableOpacity 
+                            style={[styles.btnAdd, isOutOfStock && styles.btnAddDisabled]} 
+                            onPress={() => !isOutOfStock && addToCart(item.id)}
+                            disabled={isOutOfStock}
+                        >
+                            <Text style={styles.btnAddText}>{isOutOfStock ? 'Habis' : 'Tambah'}</Text>
+                        </TouchableOpacity>
+                    )}
+                </View>
+            </View>
+        </View>
+      </View>
+    );
+  };
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.header}>Transaksi Penjualan</Text>
+    <SafeAreaView style={styles.safeArea}>
+      <StatusBar barStyle="dark-content" backgroundColor="#F8F9FA" />
+      
+      {/* Header Fixed */}
+      <View style={styles.header}>
+        <View style={styles.headerTop}>
+             <View>
+                <Text style={styles.headerTitle}>Kasir</Text>
+                <Text style={styles.headerSubtitle}>Pilih produk untuk transaksi</Text>
+             </View>
+             <View style={styles.headerIconBg}>
+                <Icon name="cart-outline" size={24} color={theme.colors.primary} />
+             </View>
+        </View>
 
-      <View style={styles.searchWrapper}>
-        <Icon name="magnify" size={20} color={theme.colors.muted} style={styles.searchIcon} />
-        <TextInput
-          placeholder="Kamu nyari produk apa?"
-          style={styles.searchInput}
-          value={query}
-          onChangeText={setQuery}
-          placeholderTextColor={theme.colors.placeholder}
-        />
+        {/* Search */}
+        <View style={styles.searchContainer}>
+            <Icon name="magnify" size={20} color="#9CA3AF" />
+            <TextInput
+                placeholder="Cari produk..."
+                style={styles.searchInput}
+                value={query}
+                onChangeText={setQuery}
+                placeholderTextColor="#9CA3AF"
+            />
+            {query.length > 0 && (
+                <TouchableOpacity onPress={() => setQuery('')}>
+                    <Icon name="close-circle" size={18} color="#9CA3AF" />
+                </TouchableOpacity>
+            )}
+        </View>
       </View>
 
+      {/* Product List */}
       <FlatList
         data={products.filter(p => p.name.toLowerCase().includes(query.toLowerCase()))}
         numColumns={2}
         keyExtractor={(item) => item.id}
-        renderItem={({ item }) => (
-          <View style={styles.card}>
-            <Text style={styles.name}>{item.name}</Text>
-            <Text style={styles.price}>{formatRupiah(item.price)}</Text>
-            <Text style={styles.stock}>Stok: {item.stock}</Text>
-
-            <View style={styles.cartActions}>
-              <TouchableOpacity onPress={() => removeFromCart(item.id)}>
-                <Icon name="minus-circle" size={22} color={theme.colors.danger} />
-              </TouchableOpacity>
-              <Text style={styles.qty}>{cart[item.id] || 0}</Text>
-              <TouchableOpacity onPress={() => addToCart(item.id)}>
-                <Icon name="plus-circle" size={22} color={theme.colors.accent} />
-              </TouchableOpacity>
-            </View>
-          </View>
-        )}
+        renderItem={renderProductItem}
         contentContainerStyle={styles.listContent}
+        columnWrapperStyle={styles.columnWrapper}
+        showsVerticalScrollIndicator={false}
+        ListFooterComponent={<View style={{ height: 120 }} />} // PENTING: Space agar item terakhir tidak ketutup
       />
 
-      
-      <View style={styles.footer}>
-        <Text style={styles.totalText}>Total: {formatRupiah(total)}</Text>
-        <TouchableOpacity
-          style={styles.btnCheckout}
-          onPress={handleCheckout}
-          disabled={loading}>
-          <Text style={styles.btnCheckoutText}>
-            {loading ? 'Memproses...' : 'Catat transaksi'}
-          </Text>
-        </TouchableOpacity>
-      </View>
-
-      
-      <Modal visible={modalVisible} transparent animationType="slide">
-        <View style={styles.modalOverlay}>
-          <View style={styles.receiptBox}>
-            <Text style={styles.receiptTitle}>Struk Pembayaran</Text>
-            <ScrollView>
-              {receipt?.items.map((item, idx) => (
-                <View key={idx} style={styles.receiptItem}>
-                  <Text style={styles.itemText}>
-                    {item.productName} x {item.quantity}
-                  </Text>
-                  <Text style={styles.itemPrice}>{formatRupiah(item.price * item.quantity)}</Text>
+      {/* Checkout Floating Bar - FIXED POSITION */}
+      {totalQty > 0 && (
+        <View style={styles.checkoutWrapper}>
+            <View style={styles.checkoutBar}>
+                <View style={styles.totalInfo}>
+                    <Text style={styles.totalLabel}>Total ({totalQty} item)</Text>
+                    <Text style={styles.totalValue}>{formatRupiah(total)}</Text>
                 </View>
-              ))}
-            </ScrollView>
 
-            <View style={styles.receiptDivider} />
-            <Text style={styles.receiptTotal}>Total: {formatRupiah(receipt?.totalAmount || 0)}</Text>
-            <Text style={styles.receiptDate}>{formatDate(receipt?.createdAt || '')}</Text>
+                <TouchableOpacity 
+                    style={styles.payButton} 
+                    onPress={handleCheckout}
+                    disabled={loading}
+                >
+                    <Text style={styles.payButtonText}>{loading ? '...' : 'Bayar'}</Text>
+                    <Icon name="arrow-right" size={20} color="#FFF" />
+                </TouchableOpacity>
+            </View>
+        </View>
+      )}
 
-            <TouchableOpacity
-              style={styles.btnClose}
-              onPress={() => setModalVisible(false)}>
-              <Text style={styles.btnCloseText}>Tutup</Text>
-            </TouchableOpacity>
+      {/* Receipt Modal */}
+      <Modal visible={modalVisible} transparent animationType="fade" onRequestClose={() => setModalVisible(false)}>
+        <View style={styles.modalBackdrop}>
+          <View style={styles.receiptPaper}>
+             <View style={styles.holePattern}>
+                {[...Array(12)].map((_, i) => <View key={i} style={styles.hole} />)}
+             </View>
+             
+             <View style={styles.receiptBody}>
+                <View style={styles.successIcon}>
+                    <Icon name="check" size={32} color="#FFF" />
+                </View>
+                <Text style={styles.receiptHeader}>Transaksi Berhasil!</Text>
+                <Text style={styles.receiptDate}>
+                    {new Date().toLocaleString('id-ID', { dateStyle: 'full', timeStyle: 'short' })}
+                </Text>
+
+                <View style={styles.divider} />
+
+                <View style={styles.itemsList}>
+                    {receipt?.items.map((item, idx) => (
+                        <View key={idx} style={styles.itemRow}>
+                            <View style={{flex: 1}}>
+                                <Text style={styles.itemName}>{item.productName}</Text>
+                                <Text style={styles.itemDetail}>{item.quantity} x {formatRupiah(item.price)}</Text>
+                            </View>
+                            <Text style={styles.itemTotal}>{formatRupiah(item.price * item.quantity)}</Text>
+                        </View>
+                    ))}
+                </View>
+
+                <View style={styles.divider} />
+
+                <View style={styles.totalRow}>
+                    <Text style={styles.totalLabelFinal}>TOTAL BAYAR</Text>
+                    <Text style={styles.totalValueFinal}>{formatRupiah(receipt?.totalAmount || 0)}</Text>
+                </View>
+
+                <TouchableOpacity 
+                    style={styles.closeBtn} 
+                    onPress={() => setModalVisible(false)}
+                >
+                    <Text style={styles.closeBtnText}>Tutup & Transaksi Baru</Text>
+                </TouchableOpacity>
+             </View>
+             
+             {/* Zigzag Bottom Effect */}
+             <View style={styles.zigzagContainer} /> 
           </View>
         </View>
       </Modal>
-    </View>
+
+    </SafeAreaView>
   );
 };
 
 export default TransactionsScreen;
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: theme.colors.background, padding: 15 },
-  header: { fontSize: 22, fontWeight: '700', marginVertical: 10, color: theme.colors.text },
-  card: {
+  safeArea: {
     flex: 1,
-    backgroundColor: theme.colors.card,
-    margin: 8,
-    borderRadius: 12,
-    padding: 10,
+    backgroundColor: '#F8F9FA',
   },
-  name: { fontWeight: '600', fontSize: 16, color: theme.colors.text },
-  price: { color: theme.colors.accent, fontWeight: '600', marginVertical: 4 },
-  stock: { color: theme.colors.muted, fontSize: 13 },
-  cartActions: {
+
+  // Header
+  header: {
+    backgroundColor: '#FFF',
+    paddingTop: Platform.OS === 'ios' ? 50 : 20,
+    paddingHorizontal: 20,
+    paddingBottom: 20,
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    elevation: 5,
+    zIndex: 10,
+  },
+  headerTop: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginTop: 6,
+    marginBottom: 16,
   },
-  qty: { fontSize: 16, fontWeight: '700', color: theme.colors.text },
-  listContent: { paddingBottom: 200 },
-  searchWrapper: { flexDirection: 'row', alignItems: 'center', backgroundColor: theme.colors.card, paddingHorizontal: 10, borderRadius: 8, marginBottom: 8 },
-  searchIcon: { marginRight: 8 },
-  searchInput: { flex: 1, paddingVertical: 8 },
-  footer: {
-    position: 'absolute',
-    bottom: 90,
-    left: 0,
-    right: 0,
-    backgroundColor: theme.colors.card,
-    padding: 16,
-    borderTopWidth: 1,
-    borderColor: theme.colors.border,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  headerTitle: {
+    fontSize: 24,
+    fontWeight: '800',
+    color: '#1F2937',
+    letterSpacing: -0.5,
   },
-  totalText: { fontSize: 18, fontWeight: '700', color: theme.colors.text },
-  btnCheckout: {
-    backgroundColor: theme.colors.accent,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 8,
+  headerSubtitle: {
+    fontSize: 14,
+    color: '#6B7280',
+    marginTop: 2,
   },
-  btnCheckoutText: { color: '#fff', fontWeight: '700' },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+  headerIconBg: {
+    width: 44,
+    height: 44,
+    backgroundColor: theme.colors.primary + '15',
+    borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  receiptBox: {
-    backgroundColor: theme.colors.card,
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F3F4F6',
     borderRadius: 12,
-    padding: 20,
-    width: '90%',
-    maxHeight: '80%',
+    paddingHorizontal: 12,
+    height: 46,
   },
-  receiptTitle: { fontSize: 20, fontWeight: '700', textAlign: 'center', marginBottom: 10 },
-  receiptItem: {
+  searchInput: {
+    flex: 1,
+    marginLeft: 10,
+    fontSize: 14,
+    color: '#1F2937',
+  },
+
+  // List
+  listContent: {
+    paddingHorizontal: CARD_MARGIN,
+    paddingTop: 20,
+  },
+  columnWrapper: {
+    justifyContent: 'space-between',
+  },
+  cardContainer: {
+    width: CARD_WIDTH,
+    marginBottom: 20,
+  },
+  card: {
+    backgroundColor: '#FFF',
+    borderRadius: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    elevation: 3,
+    overflow: 'visible', // allow badge to pop out
+  },
+  cardDisabled: {
+    opacity: 0.8,
+    backgroundColor: '#F3F4F6',
+  },
+  badgeQty: {
+    position: 'absolute',
+    top: -8,
+    right: -8,
+    backgroundColor: theme.colors.secondary,
+    minWidth: 26,
+    height: 26,
+    borderRadius: 13,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 20,
+    elevation: 5,
+    borderWidth: 2,
+    borderColor: '#FFF',
+    paddingHorizontal: 6,
+  },
+  badgeQtyText: {
+    color: '#FFF',
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  imageWrapper: {
+    height: 120,
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    overflow: 'hidden',
+    backgroundColor: '#E5E7EB',
+    position: 'relative',
+  },
+  productImage: {
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover',
+  },
+  outOfStockOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  outOfStockText: {
+    color: '#FFF',
+    fontWeight: 'bold',
+    backgroundColor: theme.colors.danger,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 4,
+    fontSize: 12,
+  },
+  cardContent: {
+    padding: 12,
+  },
+  productName: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#374151',
+    marginBottom: 4,
+  },
+  productPrice: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: theme.colors.primary,
+  },
+  stockRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 4,
+    marginBottom: 10,
+    gap: 4,
+  },
+  productStock: {
+    fontSize: 11,
+    color: '#9CA3AF',
+  },
+  actionContainer: {
+    height: 32,
+  },
+  btnAdd: {
+    flex: 1,
+    backgroundColor: theme.colors.primary + '15',
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  btnAddDisabled: {
+    backgroundColor: '#E5E7EB',
+  },
+  btnAddText: {
+    color: theme.colors.primary,
+    fontWeight: '700',
+    fontSize: 12,
+  },
+  stepper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#F3F4F6',
+    borderRadius: 8,
+    height: '100%',
+  },
+  stepBtn: {
+    width: 32,
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  stepVal: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#374151',
+  },
+
+  // Checkout Bar (Floating)
+  checkoutWrapper: {
+    position: 'absolute',
+    // INI PERBAIKANNYA: Diangkat 90px agar tidak tertutup Navbar
+    bottom: Platform.OS === 'ios' ? 100 : 90, 
+    left: 20,
+    right: 20,
+    zIndex: 100,
+  },
+  checkoutBar: {
+    backgroundColor: '#1F2937',
+    borderRadius: 16,
+    padding: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.25,
+    shadowRadius: 16,
+    elevation: 8,
+  },
+  totalInfo: {
+    flex: 1,
+  },
+  totalLabel: {
+    color: '#9CA3AF',
+    fontSize: 11,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+  },
+  totalValue: {
+    color: '#FFF',
+    fontSize: 18,
+    fontWeight: '800',
+  },
+  payButton: {
+    backgroundColor: theme.colors.primary,
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  payButtonText: {
+    color: '#FFF',
+    fontWeight: '700',
+    fontSize: 14,
+  },
+
+  // Modal Receipt
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  receiptPaper: {
+    width: '100%',
+    backgroundColor: '#FFF',
+    overflow: 'hidden',
+  },
+  holePattern: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginVertical: 4,
+    backgroundColor: '#1F2937', 
+    height: 12,
+    marginBottom: -6,
+    zIndex: 1,
   },
-  itemText: { color: theme.colors.text, fontSize: 15 },
-  itemPrice: { fontWeight: '600', color: theme.colors.accent },
-  receiptDivider: {
-    borderBottomWidth: 1,
-    borderColor: theme.colors.border,
-    marginVertical: 10,
+  hole: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: 'rgba(0,0,0,0.6)', 
+    marginTop: -10,
   },
-  receiptTotal: { fontSize: 18, fontWeight: '700', textAlign: 'right', color: theme.colors.text },
-  receiptDate: { fontSize: 13, color: theme.colors.placeholder, textAlign: 'right', marginTop: 6 },
-  btnClose: {
-    backgroundColor: theme.colors.accent,
-    marginTop: 15,
-    padding: 10,
-    borderRadius: 8,
+  receiptBody: {
+    padding: 24,
+    alignItems: 'center',
+    paddingTop: 30,
   },
-  btnCloseText: { textAlign: 'center', color: theme.colors.card, fontWeight: '700' },
+  successIcon: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: '#10B981',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  receiptHeader: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: '#1F2937',
+  },
+  receiptDate: {
+    fontSize: 12,
+    color: '#6B7280',
+    marginBottom: 20,
+  },
+  divider: {
+    width: '100%',
+    height: 1,
+    backgroundColor: '#E5E7EB',
+    marginVertical: 16,
+    borderStyle: 'dashed',
+    borderWidth: 1,
+    borderRadius: 1,
+  },
+  itemsList: {
+    width: '100%',
+  },
+  itemRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  itemName: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#374151',
+  },
+  itemDetail: {
+    fontSize: 12,
+    color: '#9CA3AF',
+    marginTop: 2,
+  },
+  itemTotal: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#374151',
+  },
+  totalRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    width: '100%',
+    marginBottom: 24,
+  },
+  totalLabelFinal: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#374151',
+  },
+  totalValueFinal: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: theme.colors.primary,
+  },
+  closeBtn: {
+    width: '100%',
+    backgroundColor: '#F3F4F6',
+    paddingVertical: 14,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  closeBtnText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#374151',
+  },
+  zigzagContainer: {
+    height: 10,
+    backgroundColor: '#FFF',
+  }
 });

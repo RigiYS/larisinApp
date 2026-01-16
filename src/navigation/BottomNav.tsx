@@ -1,140 +1,162 @@
-import React, { useEffect } from 'react';
-import { View, TouchableOpacity, StyleSheet } from 'react-native';
+/* eslint-disable react/no-unstable-nested-components */
+import React from 'react';
+import { View, TouchableOpacity, StyleSheet, Text, Platform, Dimensions } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import Ionicons from 'react-native-vector-icons/Ionicons';
-import Animated, {
-  useSharedValue,
-  withTiming,
-  useAnimatedStyle,
-} from 'react-native-reanimated';
-
 import theme from '../theme';
 
+// --- IMPORT SCREENS ---
 import HomeScreen from '../screens/HomeScreen';
 import ProductsScreen from '../screens/ProductsScreen';
-import TransactionsScreen from '../screens/TransactionScreen';
+// PERBAIKAN: Menggunakan TransactionScreen (Tanpa 's')
+import TransactionScreen from '../screens/TransactionScreen'; 
+import ProfileScreen from '../screens/ProfileScreen';
 
 const Tab = createBottomTabNavigator();
+const { width } = Dimensions.get('window');
 
-const ICONS: Record<string, string> = {
-  Home: 'home',
-  Products: 'cube',
-  Transactions: 'receipt',
+// Konfigurasi Ikon [Inactive, Active]
+const ICONS: Record<string, string[]> = {
+  Home: ['home-outline', 'home'],
+  Products: ['grid-outline', 'grid'],
+  Transactions: ['receipt-outline', 'receipt'], // Nama Route 'Transactions' tetap pakai 's' agar enak dibaca, tapi filenya TransactionScreen
+  Profile: ['person-outline', 'person'],
 };
 
-function TabItem({ label, iconName, isFocused, onPress }: any) {
-  const scale = useSharedValue(isFocused ? 1.12 : 1);
-  const translateY = useSharedValue(isFocused ? -8 : 0);
-  const labelOp = useSharedValue(isFocused ? 1 : 0);
-
-  useEffect(() => {
-    scale.value = withTiming(isFocused ? 1.12 : 1, { duration: 200 });
-    translateY.value = withTiming(isFocused ? -8 : 0, { duration: 200 });
-    labelOp.value = withTiming(isFocused ? 1 : 0, { duration: 200 });
-  }, [isFocused, scale, translateY, labelOp]);
-
-  const animatedIcon = useAnimatedStyle(() => ({
-    transform: [
-      { scale: scale.value },
-      { translateY: translateY.value },
-    ],
-  }));
-
-  const animatedLabel = useAnimatedStyle(() => ({
-    opacity: labelOp.value,
-    transform: [{ translateY: 6 - 6 * labelOp.value }],
-  }));
-
+const MyTabBar = ({ state, descriptors, navigation }: any) => {
   return (
-    <TouchableOpacity onPress={onPress} style={styles.tabButton} activeOpacity={0.8}>
-      <Animated.View style={[styles.iconContainer, isFocused && styles.iconActive, animatedIcon]}>
-        <Ionicons name={iconName} size={26} color={isFocused ? theme.colors.accent : theme.colors.icon} />
-      </Animated.View>
-
-      <Animated.Text style={[styles.label, isFocused && styles.labelActive, animatedLabel]}>
-        {label}
-      </Animated.Text>
-    </TouchableOpacity>
-  );
-}
-
-function FloatingTabBar({ state, descriptors: _descriptors, navigation }: any) {
-  return (
-    <View style={styles.wrapper}>
-      <View style={styles.floatingBar}>
+    <View style={styles.container}>
+      <View style={styles.tabBar}>
         {state.routes.map((route: any, index: number) => {
+          const { options } = descriptors[route.key];
+          const label = options.tabBarLabel !== undefined
+            ? options.tabBarLabel
+            : options.title !== undefined
+            ? options.title
+            : route.name;
+
           const isFocused = state.index === index;
-          const label = route.name;
-          const iconName = ICONS[label];
+          const iconName = ICONS[route.name] || ['help-circle-outline', 'help-circle'];
 
           const onPress = () => {
-            navigation.navigate(route.name);
+            const event = navigation.emit({
+              type: 'tabPress',
+              target: route.key,
+              canPreventDefault: true,
+            });
+
+            if (!isFocused && !event.defaultPrevented) {
+              navigation.navigate(route.name);
+            }
           };
 
           return (
-            <TabItem key={label} label={label} iconName={iconName} isFocused={isFocused} onPress={onPress} />
+            <TouchableOpacity
+              key={index}
+              accessibilityRole="button"
+              accessibilityState={isFocused ? { selected: true } : {}}
+              accessibilityLabel={options.tabBarAccessibilityLabel}
+              testID={options.tabBarTestID}
+              onPress={onPress}
+              style={styles.tabItem}
+              activeOpacity={0.8}
+            >
+              <View style={[styles.iconWrapper, isFocused && styles.iconWrapperActive]}>
+                <Ionicons
+                  name={isFocused ? iconName[1] : iconName[0]}
+                  size={20}
+                  color={isFocused ? theme.colors.primary : '#A0A0A0'}
+                />
+                <Text style={[styles.label, isFocused && styles.labelActive]}>
+                  {label}
+                </Text>
+              </View>
+            </TouchableOpacity>
           );
         })}
       </View>
     </View>
   );
-}
+};
 
-export default function BottomNav() {
+const BottomNav = () => {
   return (
     <Tab.Navigator
+      tabBar={props => <MyTabBar {...props} />}
       screenOptions={{ headerShown: false }}
-      tabBar={FloatingTabBar}
     >
-      <Tab.Screen name="Home" component={HomeScreen} />
-      <Tab.Screen name="Products" component={ProductsScreen} />
-      <Tab.Screen name="Transactions" component={TransactionsScreen} />
+      <Tab.Screen name="Home" component={HomeScreen} options={{ title: 'Home' }} />
+      <Tab.Screen name="Products" component={ProductsScreen} options={{ title: 'Produk' }} />
+      {/* Route Name boleh beda dengan Component Name. Disini Route='Transactions', Component='TransactionScreen' */}
+      <Tab.Screen name="Transactions" component={TransactionScreen} options={{ title: 'Transaksi' }} />
+      <Tab.Screen name="Profile" component={ProfileScreen} options={{ title: 'Akun' }} />
     </Tab.Navigator>
   );
 }
 
+// PERBAIKAN PENTING: Export Default harus ada!
+export default BottomNav;
+
 const styles = StyleSheet.create({
-  wrapper: {
+  container: {
     position: 'absolute',
-    bottom: 20,
+    bottom: 0,
     left: 0,
     right: 0,
     alignItems: 'center',
+    paddingBottom: Platform.OS === 'ios' ? 20 : 10, 
+    backgroundColor: 'transparent', 
   },
-  floatingBar: {
+  
+  tabBar: {
     flexDirection: 'row',
-    backgroundColor: theme.colors.accent,
-    borderRadius: 35,
-    paddingHorizontal: 25,
-    height: 70,
+    backgroundColor: '#FFFFFF',
+    width: width * 0.92, 
+    height: 65,
+    borderRadius: 20, 
+    justifyContent: 'space-between',
     alignItems: 'center',
-    elevation: 12,
-    shadowColor: '#000',
-    shadowOpacity: 0.15,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 4 },
+    paddingHorizontal: 10,
+    
+    // Shadow Modern
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 8,
   },
-  tabButton: {
+
+  tabItem: {
     flex: 1,
     alignItems: 'center',
-  },
-  iconContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: 30,
     justifyContent: 'center',
+    height: '100%',
+  },
+
+  iconWrapper: {
     alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 6,
+    paddingHorizontal: 16,
+    borderRadius: 12,
   },
-  iconActive: {
-    backgroundColor: theme.colors.card,
+
+  iconWrapperActive: {
+    backgroundColor: theme.colors.primary + '10', 
   },
+
   label: {
-    fontSize: 11,
-    color: theme.colors.icon,
+    fontSize: 10,
     marginTop: 4,
+    color: '#A0A0A0', 
+    fontWeight: '500',
   },
+
   labelActive: {
-    color: theme.colors.card,
-    fontWeight: '600',
+    color: theme.colors.primary,
+    fontWeight: '700',
   },
 });

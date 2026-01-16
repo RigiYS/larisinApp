@@ -19,11 +19,13 @@ const COLLECTION = 'products';
 export const getProducts = async (): Promise<Product[]> => {
   try {
     const snapshot = await firebaseDb.collection(COLLECTION).get();
+    console.log(`Loaded ${snapshot.docs.length} products`);
     return snapshot.docs.map((doc) => ({
       id: doc.id,
       ...doc.data(),
     } as Product));
   } catch (error: any) {
+    console.error('Error loading products:', error);
     throw new Error(error.message || 'Gagal mengambil produk');
   }
 };
@@ -115,8 +117,10 @@ export const uploadProductImage = async (
     const ref = firebaseStorage.ref(`products/${fileName}`);
     await ref.putFile(filePath);
     const url = await ref.getDownloadURL();
+    console.log('Product image uploaded:', url);
     return url;
   } catch (error: any) {
+    console.error('Error uploading image:', error);
     throw new Error(error.message || 'Gagal upload gambar');
   }
 };
