@@ -1,66 +1,62 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { View, Text, StyleSheet, FlatList, Alert, StatusBar, Platform } from "react-native";
 import theme from '../theme';
 import { firebaseAuth } from '../services/firebase';
-import {
-  onUserTransactionsChanged,
-  getTotalTransactionAmount,
-  Transaction,
-} from '../services/transactionService';
+import { onUserTransactionsChanged, Transaction } from '../services/transactionService';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
 export default function HomeScreen() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [dailyRevenue, setDailyRevenue] = useState(0);
-  const [weeklyRevenue, setWeeklyRevenue] = useState(0);
+
+  const dailyRevenue = useMemo(() => {
+    const now = new Date();
+    return transactions
+      .filter((t) => {
+        const tDate = new Date(t.createdAt);
+        return (
+          tDate.getDate() === now.getDate() &&
+          tDate.getMonth() === now.getMonth() &&
+          tDate.getFullYear() === now.getFullYear()
+        );
+      })
+      .reduce((sum, t) => sum + (t.totalAmount || 0), 0);
+  }, [transactions]);
+
+  const weeklyRevenue = useMemo(() => {
+    const weekAgo = new Date();
+    weekAgo.setDate(weekAgo.getDate() - 7);
+    
+    return transactions
+      .filter((t) => new Date(t.createdAt) >= weekAgo)
+      .reduce((sum, t) => sum + (t.totalAmount || 0), 0);
+  }, [transactions]);
 
   useEffect(() => {
     const user = firebaseAuth.currentUser;
     if (!user) {
-      Alert.alert('Autentikasi', 'Silakan login ulang untuk melihat transaksi');
+      Alert.alert('Autentikasi', 'Login ulang untuk melihat transaksi');
       return;
     }
 
     const unsubscribe = onUserTransactionsChanged(
       user.uid,
       (data) => {
-        // Sort transaksi dari yang terbaru (Best Practice untuk Dashboard)
-        const sortedData = [...data].sort((a, b) => 
-            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        const sortedData = [...data].sort((a, b) =>
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
         );
         setTransactions(sortedData);
-
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        const todayStr = today.toISOString().split("T")[0];
-        const weekAgo = new Date();
-        weekAgo.setDate(weekAgo.getDate() - 7);
-
-        const daily = sortedData
-          .filter((t) => t.createdAt && t.createdAt.startsWith(todayStr))
-          .reduce((sum, t) => sum + (t.totalAmount || 0), 0);
-
-        const weekly = sortedData
-          .filter((t) => t.createdAt && new Date(t.createdAt) >= weekAgo)
-          .reduce((sum, t) => sum + (t.totalAmount || 0), 0);
-
-        setDailyRevenue(daily);
-        setWeeklyRevenue(weekly);
       },
-      (error) => console.log('Transaction loading:', error.message)
+      (error) => console.log('Subscribe transaksi error:', error.message)
     );
-
-    getTotalTransactionAmount(user.uid).then(setWeeklyRevenue).catch(() => {});
 
     return () => { if (unsubscribe) unsubscribe(); };
   }, []);
 
-  // --- COMPONENT BAGIAN HEADER (DASHBOARD) ---
   const renderHeader = () => (
     <View style={styles.headerContainer}>
       <View style={styles.headerTextContainer}>
         <View>
-          <Text style={styles.greetingText}>Halo, Pemilik Toko 👋</Text>
+          <Text style={styles.greetingText}>Selamat Datang di Larisin</Text>
           <Text style={styles.headerTitle}>Ringkasan Bisnis</Text>
         </View>
         <View style={styles.profileBadge}>
@@ -68,9 +64,7 @@ export default function HomeScreen() {
         </View>
       </View>
 
-      {/* Modern Dashboard Cards */}
       <View style={styles.statsRow}>
-        {/* Daily Card */}
         <View style={[styles.statCard, styles.shadowSubtle]}>
           <View style={[styles.iconCircle, { backgroundColor: theme.colors.primary + '15' }]}>
             <Icon name="cash-fast" size={22} color={theme.colors.primary} />
@@ -81,7 +75,6 @@ export default function HomeScreen() {
           </View>
         </View>
 
-        {/* Weekly Card */}
         <View style={[styles.statCard, styles.shadowSubtle]}>
           <View style={[styles.iconCircle, { backgroundColor: theme.colors.secondary + '15' }]}>
             <Icon name="chart-timeline-variant" size={22} color={theme.colors.secondary} />
@@ -102,7 +95,6 @@ export default function HomeScreen() {
     </View>
   );
 
-  // --- COMPONENT EMPTY STATE ---
   const renderEmpty = () => (
     <View style={styles.emptyContainer}>
       <View style={styles.emptyIconBg}>
@@ -113,7 +105,6 @@ export default function HomeScreen() {
     </View>
   );
 
-  // --- COMPONENT ITEM TRANSAKSI ---
   const renderTransactionItem = ({ item }: { item: Transaction }) => (
     <View style={[styles.transactionCard, styles.shadowSubtle]}>
       {/* Top Row: Date & Status */}

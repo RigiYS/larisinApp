@@ -242,6 +242,7 @@ const ProductsScreen = () => {
             contentContainerStyle={styles.listContent}
             showsVerticalScrollIndicator={false}
             columnWrapperStyle={styles.columnWrapper}
+            removeClippedSubviews={true}
         />
       )}
 

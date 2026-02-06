@@ -81,9 +81,6 @@ export const addTransaction = async (
   }
 };
 
-/**
- * Update status transaksi
- */
 export const updateTransactionStatus = async (
   id: string,
   status: 'pending' | 'completed' | 'cancelled'
@@ -98,9 +95,6 @@ export const updateTransactionStatus = async (
   }
 };
 
-/**
- * Hapus transaksi
- */
 export const deleteTransaction = async (id: string): Promise<void> => {
   try {
     await firebaseDb.collection(COLLECTION).doc(id).delete();
@@ -109,9 +103,6 @@ export const deleteTransaction = async (id: string): Promise<void> => {
   }
 };
 
-/**
- * Hitung total transaksi user dalam periode tertentu
- */
 export const getTotalTransactionAmount = async (
   userId: string,
   startDate?: Date,

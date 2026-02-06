@@ -1,7 +1,8 @@
-import { firebaseDb, firebaseStorage } from './firebase';
+import { firebaseAuth, firebaseDb, firebaseStorage } from './firebase';
 
 export interface Product {
   id: string;
+  userId: string;
   name: string;
   price: number;
   stock: number;
@@ -17,9 +18,18 @@ const COLLECTION = 'products';
  * Ambil semua produk
  */
 export const getProducts = async (): Promise<Product[]> => {
+  const currentUser = firebaseAuth.currentUser;
+  
+  if (!currentUser) return []; // Atau throw error
+
   try {
-    const snapshot = await firebaseDb.collection(COLLECTION).get();
-    console.log(`Loaded ${snapshot.docs.length} products`);
+    // Gunakan query .where() seperti di transactionService
+    const snapshot = await firebaseDb.collection(COLLECTION)
+      .where('userId', '==', currentUser.uid) 
+      .get();
+
+    console.log(`Loaded ${snapshot.docs.length} products for user ${currentUser.uid}`);
+    
     return snapshot.docs.map((doc) => ({
       id: doc.id,
       ...doc.data(),
@@ -49,10 +59,18 @@ export const getProduct = async (id: string): Promise<Product | null> => {
 /**
  * Tambah produk baru
  */
-export const addProduct = async (product: Omit<Product, 'id'>): Promise<string> => {
+export const addProduct = async (product: Omit<Product, 'id' | 'userId'>): Promise<string> => {
+  const currentUser = firebaseAuth.currentUser;
+  
+  // Kritik: Anda tidak boleh membiarkan operasi DB tanpa user yang jelas
+  if (!currentUser) {
+    throw new Error('User tidak terautentikasi. Dilarang menambah produk.');
+  }
+
   try {
     const docRef = await firebaseDb.collection(COLLECTION).add({
       ...product,
+      userId: currentUser.uid, // <--- INI KUNCINYA. Tempelkan ID pemilik.
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     });
@@ -132,16 +150,21 @@ export const onProductsChanged = (
   callback: (products: Product[]) => void,
   onError?: (error: Error) => void
 ) => {
-  return firebaseDb.collection(COLLECTION).onSnapshot(
-    (snapshot) => {
-      const products = snapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      } as Product));
-      callback(products);
-    },
-    (error) => {
-      if (onError) onError(new Error(error.message || 'Gagal subscribe produk'));
-    }
-  );
+  const currentUser = firebaseAuth.currentUser;
+  if (!currentUser) return () => {};
+
+  return firebaseDb.collection(COLLECTION)
+    .where('userId', '==', currentUser.uid) 
+    .onSnapshot(
+      (snapshot) => {
+        const products = snapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        } as Product));
+        callback(products);
+      },
+      (error) => {
+        if (onError) onError(new Error(error.message));
+      }
+    );
 };
