@@ -29,7 +29,7 @@ const AddProductModal: React.FC<Props> = ({ visible, onClose, onSave }) => {
     <Modal visible={visible} animationType="slide" transparent>
       <View style={styles.overlay}>
         <View style={styles.modalContainer}>
-          <Text style={styles.title}>Tambah Produk Baru</Text>
+          <Text style={styles.title}>Tambah  Produk Baru</Text>
           <TextInput placeholder="Nama Produk" style={styles.input} value={name} onChangeText={setName} />
           <TextInput placeholder="Harga" keyboardType="numeric" style={styles.input} value={price} onChangeText={setPrice} />
           <TextInput placeholder="Stok" keyboardType="numeric" style={styles.input} value={stock} onChangeText={setStock} />

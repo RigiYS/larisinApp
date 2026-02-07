@@ -5,21 +5,18 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import theme from '../theme';
 
-// --- IMPORT SCREENS ---
 import HomeScreen from '../screens/HomeScreen';
 import ProductsScreen from '../screens/ProductsScreen';
-// PERBAIKAN: Menggunakan TransactionScreen (Tanpa 's')
 import TransactionScreen from '../screens/TransactionScreen'; 
 import ProfileScreen from '../screens/ProfileScreen';
 
 const Tab = createBottomTabNavigator();
 const { width } = Dimensions.get('window');
 
-// Konfigurasi Ikon [Inactive, Active]
 const ICONS: Record<string, string[]> = {
   Home: ['home-outline', 'home'],
   Products: ['grid-outline', 'grid'],
-  Transactions: ['receipt-outline', 'receipt'], // Nama Route 'Transactions' tetap pakai 's' agar enak dibaca, tapi filenya TransactionScreen
+  Transactions: ['receipt-outline', 'receipt'],
   Profile: ['person-outline', 'person'],
 };
 
@@ -87,14 +84,12 @@ const BottomNav = () => {
     >
       <Tab.Screen name="Home" component={HomeScreen} options={{ title: 'Home' }} />
       <Tab.Screen name="Products" component={ProductsScreen} options={{ title: 'Produk' }} />
-      {/* Route Name boleh beda dengan Component Name. Disini Route='Transactions', Component='TransactionScreen' */}
       <Tab.Screen name="Transactions" component={TransactionScreen} options={{ title: 'Transaksi' }} />
       <Tab.Screen name="Profile" component={ProfileScreen} options={{ title: 'Akun' }} />
     </Tab.Navigator>
   );
 }
 
-// PERBAIKAN PENTING: Export Default harus ada!
 export default BottomNav;
 
 const styles = StyleSheet.create({
@@ -118,7 +113,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 10,
     
-    // Shadow Modern
     shadowColor: "#000",
     shadowOffset: {
       width: 0,

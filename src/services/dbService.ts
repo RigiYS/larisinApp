@@ -11,77 +11,72 @@ export const getDBConnection = async () => {
 };
 
 export const createTables = async (db: SQLite.SQLiteDatabase) => {
-  const query = `CREATE TABLE IF NOT EXISTS products (
-    id TEXT PRIMARY KEY,
-    name TEXT NOT NULL,
-    price REAL,
-    stock INTEGER,
-    image TEXT
-  );`;
-
-  await db.executeSql(`CREATE TABLE IF NOT EXISTS products (
-    id TEXT PRIMARY KEY,
-    name TEXT NOT NULL,
-    price REAL,
-    stock INTEGER,
-    image TEXT
-  );`);
-
-  await db.executeSql(`CREATE TABLE IF NOT EXISTS transactions (
-    id TEXT PRIMARY KEY,
-    userId TEXT,
-    items TEXT, 
-    totalAmount REAL,
-    status TEXT,
-    createdAt TEXT,
-    updatedAt TEXT
-  );`);
+  const queries = [
+    `CREATE TABLE IF NOT EXISTS products (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      price REAL,
+      stock INTEGER,
+      image TEXT
+    );`,
+    `CREATE TABLE IF NOT EXISTS transactions (
+      id TEXT PRIMARY KEY,
+      userId TEXT,
+      items TEXT, 
+      totalAmount REAL,
+      status TEXT,
+      createdAt TEXT,
+      updatedAt TEXT
+    );`
+  ];
 
   try {
-    await db.executeSql(query);
-    console.log('Table "products" created or already exists');
+    for (const q of queries) {
+      await db.executeSql(q);
+    }
+    console.log('Semua tabel berhasil diverifikasi/dibuat');
   } catch (error) {
-    console.error('Error creating table:', error);
+    console.error('Error creating tables:', error);
     throw error; 
   }
 };
 
 export const saveProductsLocal = async (db: SQLite.SQLiteDatabase, products: any[]) => {
   if (products.length === 0) return;
-
   try {
-    
-    await db.transaction(async (tx) => {
+    await db.transaction((tx) => {
       for (const p of products) {
-        await tx.executeSql(
+        tx.executeSql(
           `INSERT OR REPLACE INTO products (id, name, price, stock, image) VALUES (?, ?, ?, ?, ?)`,
-          [p.id, p.name, p.price, p.stock, p.image || '']
+          [p.id, p.name, p.price, p.stock, p.image || ''],
+          () => {},
+          (_, err) => { console.error('SQL Save Product Error:', err); return false; }
         );
       }
     });
-    
-    console.log(`Saved ${products.length} products to local SQLite`);
+    console.log(`Saved ${products.length} products locally`);
   } catch (error) {
-    console.error('Error saving products locally:', error);
-    throw error;
+    console.error('Transaction Error (Products):', error);
   }
 };
 
 export const saveTransactionsLocal = async (db: SQLite.SQLiteDatabase, transactions: any[]) => {
   if (transactions.length === 0) return;
   try {
-    await db.transaction(async (tx) => {
+    await db.transaction((tx) => {
       for (const t of transactions) {
         const itemsJson = JSON.stringify(t.items);
-        await tx.executeSql(
+        tx.executeSql(
           `INSERT OR REPLACE INTO transactions (id, userId, items, totalAmount, status, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-          [t.id, t.userId, itemsJson, t.totalAmount, t.status, t.createdAt, t.updatedAt]
+          [t.id, t.userId, itemsJson, t.totalAmount, t.status, t.createdAt, t.updatedAt],
+          () => {},
+          (_, err) => { console.error('SQL Save Transaction Error:', err); return false; }
         );
       }
     });
-    console.log(`Saved ${transactions.length} transactions to SQLite`);
+    console.log(`Saved ${transactions.length} transactions locally`);
   } catch (error) {
-    console.error('Error saving transactions local:', error);
+    console.error('Transaction Error (Transactions):', error);
   }
 };
 
