@@ -1,5 +1,5 @@
 /* eslint-disable react-native/no-inline-styles */
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -26,6 +26,7 @@ import {
 } from '../services/productService';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import theme from '../theme';
+import ProductItem from '../components/ProductItem'; 
 
 interface Product {
   id: string;
@@ -35,10 +36,8 @@ interface Product {
   image: string;
 }
 
-const { width } = Dimensions.get('window');
-// Menghitung lebar kartu agar pas 2 kolom dengan margin
+Dimensions.get('window');
 const CARD_MARGIN = 12;
-const CARD_WIDTH = (width / 2) - (CARD_MARGIN * 2);
 
 const ProductsScreen = () => {
   const [products, setProducts] = useState<Product[]>([]);
@@ -47,7 +46,6 @@ const ProductsScreen = () => {
   const [modalVisible, setModalVisible] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   
-  // State Form
   const [form, setForm] = useState({
     name: '',
     price: '',
@@ -55,10 +53,14 @@ const ProductsScreen = () => {
     image: '',
   });
 
-  const fetchProducts = () => {
+  // --- DATA FETCHING ---
+  useEffect(() => {
+    let isMounted = true;
     setLoading(true);
+
     const unsubscribe = onProductsChanged(
       (items) => {
+        if (!isMounted) return;
         const mapped: Product[] = items.map((p) => ({
           id: p.id,
           name: p.name,
@@ -70,20 +72,21 @@ const ProductsScreen = () => {
         setLoading(false);
       },
       () => {
-        Alert.alert('Error', 'Gagal memuat produk');
-        setLoading(false);
+        if (isMounted) {
+          Alert.alert('Error', 'Gagal memuat produk');
+          setLoading(false);
+        }
       }
     );
-    return unsubscribe;
-  };
 
-  useEffect(() => {
-    const unsub = fetchProducts();
     return () => {
-      if (typeof unsub === 'function') unsub();
+      isMounted = false;
+      unsubscribe();
     };
   }, []);
 
+  // --- HANDLERS (useCallback untuk Optimasi) ---
+  
   const handleSave = async () => {
     try {
       if (!form.name || !form.price || !form.stock || !form.image) {
@@ -111,7 +114,7 @@ const ProductsScreen = () => {
     }
   };
 
-  const handleDelete = (id: string) => {
+  const handleDelete = useCallback((id: string) => {
     Alert.alert(
         'Hapus Produk',
         'Yakin ingin menghapus produk ini selamanya?',
@@ -130,9 +133,9 @@ const ProductsScreen = () => {
             }
         ]
     );
-  };
+  }, []);
 
-  const openEditModal = (product: Product) => {
+  const openEditModal = useCallback((product: Product) => {
     setSelectedProduct(product);
     setForm({
       name: product.name,
@@ -141,53 +144,24 @@ const ProductsScreen = () => {
       image: product.image,
     });
     setModalVisible(true);
-  };
+  }, []);
 
   const resetForm = () => {
       setSelectedProduct(null);
       setForm({ name: '', price: '', stock: '', image: '' });
   };
 
-  // --- RENDER ITEM ---
-  const renderProductItem = ({ item }: { item: Product }) => (
-    <View style={styles.cardContainer}>
-      <View style={styles.card}>
-        {/* Image Section */}
-        <View style={styles.imageWrapper}>
-            <Image source={{ uri: item.image }} style={styles.productImage} />
-            {/* Floating Stock Badge */}
-            <View style={[styles.stockBadge, item.stock < 5 && styles.stockLow]}>
-                <Icon name="package-variant" size={12} color="#FFF" />
-                <Text style={styles.stockText}>{item.stock} Unit</Text>
-            </View>
-        </View>
+  const renderItem = useCallback(({ item }: { item: Product }) => (
+    <ProductItem 
+      item={item} 
+      onEdit={openEditModal} 
+      onDelete={handleDelete} 
+    />
+  ), [openEditModal, handleDelete]); // Dependency array penting agar tidak re-render
 
-        {/* Content Section */}
-        <View style={styles.cardContent}>
-            <Text style={styles.productPrice}>Rp {item.price.toLocaleString('id-ID')}</Text>
-            <Text style={styles.productName} numberOfLines={2}>{item.name}</Text>
-            
-            <View style={styles.divider} />
+  // --- UI RENDER ---
 
-            {/* Actions Row */}
-            <View style={styles.actionRow}>
-                <TouchableOpacity 
-                    style={[styles.actionBtn, styles.editBtn]} 
-                    onPress={() => openEditModal(item)}
-                >
-                    <Icon name="pencil" size={18} color={theme.colors.primary} />
-                </TouchableOpacity>
-                <TouchableOpacity 
-                    style={[styles.actionBtn, styles.deleteBtn]} 
-                    onPress={() => handleDelete(item.id)}
-                >
-                    <Icon name="trash-can-outline" size={18} color={theme.colors.danger} />
-                </TouchableOpacity>
-            </View>
-        </View>
-      </View>
-    </View>
-  );
+  const filteredProducts = products.filter(p => p.name.toLowerCase().includes(query.toLowerCase()));
 
   return (
     <View style={styles.container}>
@@ -202,7 +176,7 @@ const ProductsScreen = () => {
             </View>
         </View>
         
-        {/* Search Bar Modern */}
+        {/* Search Bar */}
         <View style={styles.searchContainer}>
             <Icon name="magnify" size={20} color="#9CA3AF" />
             <TextInput
@@ -235,14 +209,17 @@ const ProductsScreen = () => {
          </View>
       ) : (
         <FlatList
-            data={products.filter(p => p.name.toLowerCase().includes(query.toLowerCase()))}
+            data={filteredProducts}
             keyExtractor={(item) => item.id}
-            renderItem={renderProductItem}
+            renderItem={renderItem} // Menggunakan renderItem yang sudah di-memo
             numColumns={2}
             contentContainerStyle={styles.listContent}
             showsVerticalScrollIndicator={false}
             columnWrapperStyle={styles.columnWrapper}
-            removeClippedSubviews={true}
+            removeClippedSubviews={true} // Optimasi FlatList Android
+            initialNumToRender={8} // Render awal secukupnya
+            maxToRenderPerBatch={8} // Batch render saat scroll
+            windowSize={5} 
         />
       )}
 
@@ -375,7 +352,7 @@ const styles = StyleSheet.create({
     letterSpacing: -0.5,
   },
   productCountBadge: {
-    backgroundColor: theme.colors.primary + '20', // Tint
+    backgroundColor: theme.colors.primary + '20',
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 12,
@@ -404,94 +381,10 @@ const styles = StyleSheet.create({
   listContent: {
     paddingVertical: 20,
     paddingHorizontal: CARD_MARGIN,
-    paddingBottom: 100, // Space for FAB
+    paddingBottom: 100,
   },
   columnWrapper: {
     justifyContent: 'space-between',
-  },
-  cardContainer: {
-    width: CARD_WIDTH,
-    marginBottom: 20,
-  },
-  card: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    // Modern shadow
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 3,
-    overflow: 'hidden',
-  },
-  imageWrapper: {
-    height: 140,
-    width: '100%',
-    backgroundColor: '#E5E7EB',
-    position: 'relative',
-  },
-  productImage: {
-    width: '100%',
-    height: '100%',
-    resizeMode: 'cover',
-  },
-  stockBadge: {
-    position: 'absolute',
-    top: 8,
-    right: 8,
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 20,
-    gap: 4,
-  },
-  stockLow: {
-    backgroundColor: theme.colors.danger,
-  },
-  stockText: {
-    color: '#FFF',
-    fontSize: 10,
-    fontWeight: '700',
-  },
-  cardContent: {
-    padding: 12,
-  },
-  productPrice: {
-    fontSize: 15,
-    fontWeight: '800',
-    color: theme.colors.primary,
-    marginBottom: 2,
-  },
-  productName: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#374151',
-    lineHeight: 18,
-    height: 36, // 2 baris text
-  },
-  divider: {
-    height: 1,
-    backgroundColor: '#F3F4F6',
-    marginVertical: 10,
-  },
-  actionRow: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  actionBtn: {
-    flex: 1,
-    height: 32,
-    borderRadius: 8,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  editBtn: {
-    backgroundColor: theme.colors.primary + '15',
-  },
-  deleteBtn: {
-    backgroundColor: '#FEE2E2', // Light red
   },
 
   // Empty State
@@ -531,7 +424,7 @@ const styles = StyleSheet.create({
   // FAB
   fab: {
     position: 'absolute',
-    bottom: 90, // Above bottom nav
+    bottom: 90,
     right: 20,
     width: 56,
     height: 56,
@@ -550,14 +443,14 @@ const styles = StyleSheet.create({
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'flex-end', // Bottom Sheet style
+    justifyContent: 'flex-end',
   },
   modalContainer: {
     backgroundColor: '#FFF',
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     padding: 24,
-    height: '85%', // Occupy 85% screen
+    height: '85%',
   },
   modalHeader: {
     flexDirection: 'row',
