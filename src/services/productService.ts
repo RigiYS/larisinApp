@@ -1,4 +1,5 @@
 import { firebaseAuth, firebaseDb, firebaseStorage } from './firebase';
+import { getDBConnection, saveProductsLocal, getProductsLocal } from './dbService'; 
 
 export interface Product {
   id: string;
@@ -14,63 +15,61 @@ export interface Product {
 
 const COLLECTION = 'products';
 
-/**
- * Ambil semua produk
- */
 export const getProducts = async (): Promise<Product[]> => {
-  const currentUser = firebaseAuth.currentUser;
-  
-  if (!currentUser) return []; // Atau throw error
-
   try {
-    // Gunakan query .where() seperti di transactionService
+    const db = await getDBConnection();
+    const localProducts = await getProductsLocal(db);
+    
+    if (localProducts.length > 0) {
+      console.log(`Loaded ${localProducts.length} products from SQLite`);
+      return localProducts;
+    }
+
+    const currentUser = firebaseAuth.currentUser;
+    if (!currentUser) return [];
+
     const snapshot = await firebaseDb.collection(COLLECTION)
       .where('userId', '==', currentUser.uid) 
       .get();
 
-    console.log(`Loaded ${snapshot.docs.length} products for user ${currentUser.uid}`);
-    
-    return snapshot.docs.map((doc) => ({
+    const onlineProducts = snapshot.docs.map((doc) => ({
       id: doc.id,
       ...doc.data(),
     } as Product));
+
+    if (onlineProducts.length > 0) {
+      await saveProductsLocal(db, onlineProducts);
+    }
+
+    return onlineProducts;
+
   } catch (error: any) {
     console.error('Error loading products:', error);
-    throw new Error(error.message || 'Gagal mengambil produk');
+    return [];
   }
 };
 
-/**
- * Ambil satu produk berdasarkan ID
- */
 export const getProduct = async (id: string): Promise<Product | null> => {
   try {
     const doc = await firebaseDb.collection(COLLECTION).doc(id).get();
     if (!doc.exists) return null;
-    return {
-      id: doc.id,
-      ...doc.data(),
-    } as Product;
+    return { id: doc.id, ...doc.data() } as Product;
   } catch (error: any) {
     throw new Error(error.message || 'Gagal mengambil produk');
   }
 };
 
-/**
- * Tambah produk baru
- */
 export const addProduct = async (product: Omit<Product, 'id' | 'userId'>): Promise<string> => {
   const currentUser = firebaseAuth.currentUser;
   
-  // Kritik: Anda tidak boleh membiarkan operasi DB tanpa user yang jelas
   if (!currentUser) {
-    throw new Error('User tidak terautentikasi. Dilarang menambah produk.');
+    throw new Error('User tidak terautentikasi.');
   }
 
   try {
     const docRef = await firebaseDb.collection(COLLECTION).add({
       ...product,
-      userId: currentUser.uid, // <--- INI KUNCINYA. Tempelkan ID pemilik.
+      userId: currentUser.uid,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     });
@@ -80,9 +79,6 @@ export const addProduct = async (product: Omit<Product, 'id' | 'userId'>): Promi
   }
 };
 
-/**
- * Update produk
- */
 export const updateProduct = async (id: string, updates: Partial<Product>): Promise<void> => {
   try {
     await firebaseDb.collection(COLLECTION).doc(id).update({
@@ -94,9 +90,6 @@ export const updateProduct = async (id: string, updates: Partial<Product>): Prom
   }
 };
 
-/**
- * Hapus produk
- */
 export const deleteProduct = async (id: string): Promise<void> => {
   try {
     await firebaseDb.collection(COLLECTION).doc(id).delete();
@@ -105,9 +98,6 @@ export const deleteProduct = async (id: string): Promise<void> => {
   }
 };
 
-/**
- * Cari produk berdasarkan nama
- */
 export const searchProducts = async (query: string): Promise<Product[]> => {
   try {
     const snapshot = await firebaseDb
@@ -124,28 +114,16 @@ export const searchProducts = async (query: string): Promise<Product[]> => {
   }
 };
 
-/**
- * Upload gambar produk ke Cloud Storage
- */
-export const uploadProductImage = async (
-  filePath: string,
-  fileName: string
-): Promise<string> => {
+export const uploadProductImage = async (filePath: string, fileName: string): Promise<string> => {
   try {
     const ref = firebaseStorage.ref(`products/${fileName}`);
     await ref.putFile(filePath);
-    const url = await ref.getDownloadURL();
-    console.log('Product image uploaded:', url);
-    return url;
+    return await ref.getDownloadURL();
   } catch (error: any) {
-    console.error('Error uploading image:', error);
     throw new Error(error.message || 'Gagal upload gambar');
   }
 };
 
-/**
- * Subscribe ke perubahan produk real-time
- */
 export const onProductsChanged = (
   callback: (products: Product[]) => void,
   onError?: (error: Error) => void
@@ -156,11 +134,19 @@ export const onProductsChanged = (
   return firebaseDb.collection(COLLECTION)
     .where('userId', '==', currentUser.uid) 
     .onSnapshot(
-      (snapshot) => {
+      async (snapshot) => {
         const products = snapshot.docs.map((doc) => ({
           id: doc.id,
           ...doc.data(),
         } as Product));
+        
+        try {
+           const db = await getDBConnection();
+           await saveProductsLocal(db, products);
+           console.log('SQLite synced with Firestore updates.');
+        } catch (err) {
+           console.error('Gagal sync ke SQLite:', err);
+        }
         callback(products);
       },
       (error) => {

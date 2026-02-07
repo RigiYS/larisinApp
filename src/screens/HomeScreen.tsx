@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, FlatList, Alert, StatusBar, Platform } from "re
 import theme from '../theme';
 import { firebaseAuth } from '../services/firebase';
 import { onUserTransactionsChanged, Transaction } from '../services/transactionService';
+import { getLocalTransactions } from '../services/transactionService';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
 export default function HomeScreen() {
@@ -38,18 +39,24 @@ export default function HomeScreen() {
       return;
     }
 
-    const unsubscribe = onUserTransactionsChanged(
-      user.uid,
-      (data) => {
-        const sortedData = [...data].sort((a, b) =>
-          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-        );
-        setTransactions(sortedData);
-      },
-      (error) => console.log('Subscribe transaksi error:', error.message)
-    );
+    const loadLocal = async () => {
+      const localData = await getLocalTransactions();
+      if (localData.length > 0) {
+        setTransactions(localData);
+        console.log("Loaded local transactions for Home");
+      }
+    };
+    loadLocal();
 
-    return () => { if (unsubscribe) unsubscribe(); };
+    const unsubscribe = onUserTransactionsChanged(
+    user.uid,
+    (data) => {
+      setTransactions(data);
+    },
+    (error) => console.log('Subscribe transaksi error:', error.message)
+  );
+
+  return () => { if (unsubscribe) unsubscribe(); };
   }, []);
 
   const renderHeader = () => (

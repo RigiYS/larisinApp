@@ -40,7 +40,6 @@ const LoginScreen: React.FC<Props> = ({ onLoginSuccess, goToRegister }) => {
     setLoading(true);
     try {
       await signIn(email, password);
-      // Feedback sukses opsional, biasanya langsung redirect
       onLoginSuccess && onLoginSuccess();
     } catch (error: any) {
       Alert.alert('Gagal Masuk', error.message || 'Periksa kembali email dan password Anda.');
@@ -102,7 +101,7 @@ const LoginScreen: React.FC<Props> = ({ onLoginSuccess, goToRegister }) => {
               <Icon name="lock-outline" size={22} color="#9CA3AF" style={styles.inputIcon} />
               <TextInput
                 style={styles.input}
-                placeholder="••••••••"
+                placeholder="********"
                 placeholderTextColor="#9CA3AF"
                 secureTextEntry={!showPassword}
                 value={password}
@@ -140,7 +139,6 @@ const LoginScreen: React.FC<Props> = ({ onLoginSuccess, goToRegister }) => {
           </TouchableOpacity>
         </View>
 
-        {/* Footer Section */}
         <View style={styles.footer}>
           <Text style={styles.footerText}>Belum memiliki akun? </Text>
           <TouchableOpacity onPress={goToRegister}>
@@ -278,12 +276,11 @@ const styles = StyleSheet.create({
     marginLeft: 8,
   },
 
-  // Footer Styles
   footer: {
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    marginTop: 'auto', // Push to bottom if space available
+    marginTop: 'auto',
   },
   footerText: {
     fontSize: 14,

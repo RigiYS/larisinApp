@@ -1,4 +1,5 @@
 import { firebaseDb } from './firebase';
+import { getDBConnection, saveTransactionsLocal, getTransactionsLocal } from './dbService'; 
 
 export interface Transaction {
   id: string;
@@ -23,9 +24,6 @@ export interface TransactionItem {
 
 const COLLECTION = 'transactions';
 
-/**
- * Ambil semua transaksi user
- */
 export const getUserTransactions = async (userId: string): Promise<Transaction[]> => {
   try {
     const snapshot = await firebaseDb
@@ -42,9 +40,6 @@ export const getUserTransactions = async (userId: string): Promise<Transaction[]
   }
 };
 
-/**
- * Ambil satu transaksi
- */
 export const getTransaction = async (id: string): Promise<Transaction | null> => {
   try {
     const doc = await firebaseDb.collection(COLLECTION).doc(id).get();
@@ -58,9 +53,16 @@ export const getTransaction = async (id: string): Promise<Transaction | null> =>
   }
 };
 
-/**
- * Tambah transaksi baru
- */
+export const getLocalTransactions = async (): Promise<Transaction[]> => {
+  try {
+    const db = await getDBConnection();
+    return await getTransactionsLocal(db);
+  } catch (error) {
+    console.error(error);
+    return [];
+  }
+};
+
 export const addTransaction = async (
   transaction: Omit<Transaction, 'id' | 'createdAt' | 'updatedAt'>
 ): Promise<string> => {
@@ -109,7 +111,6 @@ export const getTotalTransactionAmount = async (
   endDate?: Date
 ): Promise<number> => {
   try {
-    // Get all transactions for user first (no complex index needed)
     const snapshot = await firebaseDb
       .collection(COLLECTION)
       .where('userId', '==', userId)
@@ -119,10 +120,8 @@ export const getTotalTransactionAmount = async (
     snapshot.docs.forEach((doc) => {
       const data = doc.data();
       
-      // Filter by status
       if (data.status !== 'completed') return;
       
-      // Filter by date range
       if (startDate && new Date(data.createdAt) < startDate) return;
       if (endDate && new Date(data.createdAt) > endDate) return;
       
@@ -134,9 +133,6 @@ export const getTotalTransactionAmount = async (
   }
 };
 
-/**
- * Subscribe ke transaksi user real-time
- */
 export const onUserTransactionsChanged = (
   userId: string,
   callback: (transactions: Transaction[]) => void,
@@ -146,13 +142,22 @@ export const onUserTransactionsChanged = (
     .collection(COLLECTION)
     .where('userId', '==', userId)
     .onSnapshot(
-      (snapshot) => {
+      async (snapshot) => {
         const transactions = snapshot.docs.map((doc) => ({
           id: doc.id,
           ...doc.data(),
         } as Transaction));
-        // Sort client-side to avoid composite index requirement
+        
         transactions.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+        try {
+          const db = await getDBConnection();
+          await saveTransactionsLocal(db, transactions);
+          console.log("Transactions synced to SQLite");
+        } catch (err) {
+          console.error("Failed to sync transactions locally", err);
+        }
+
         callback(transactions);
       },
       (error) => {
